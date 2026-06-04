@@ -1,0 +1,29 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fa3a3a"/>
+      <stop offset="1" stop-color="#7a0d0d"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000000" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <!-- Фон: скруглённый квадрат с фирменным градиентом -->
+  <rect width="512" height="512" rx="128" fill="url(#bg)"/>
+
+  <!-- Лёгкий блик сверху для объёма -->
+  <rect width="512" height="512" rx="128" fill="white" fill-opacity="0.06"/>
+
+  <!-- Чат-пузырь -->
+  <g filter="url(#soft)">
+    <path fill="#ffffff" d="M256 104c-82.7 0-150 59.5-150 133 0 39.3 19.3 74.6 50 99.1 0 0 .3 .2 .3 .5 1.6 16.7-6.6 36.7-17.5 52.6-3.6 5.2 1 12.2 7.2 11.1 28.7-5.2 56.7-16.6 73.7-28.4 11.7 2.7 24 4.1 36.6 4.1 82.7 0 150-59.5 150-133S338.7 104 256 104Z"/>
+  </g>
+
+  <!-- Три точки -->
+  <g fill="url(#bg)">
+    <circle cx="192" cy="237" r="22"/>
+    <circle cx="256" cy="237" r="22"/>
+    <circle cx="320" cy="237" r="22"/>
+  </g>
+</svg>
