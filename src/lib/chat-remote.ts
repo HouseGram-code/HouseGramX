@@ -245,7 +245,7 @@ export async function loadMyChats(uid: string): Promise<Conversation[]> {
   if (!isSupabaseConfigured) return [];
   const sb = getSupabase();
 
-  // Мои членства.
+  // Мои чл��нства.
   const { data: memberRows } = await sb
     .from("chat_members")
     .select("chat_id, user_id, role, muted, muted_until, last_read, blocked")
@@ -328,7 +328,7 @@ async function resolveDirectChats(
 
   const { data: profs } = await sb
     .from("profiles")
-    .select("id, name, username, avatar, color, last_seen, official")
+    .select("id, name, username, avatar, color, last_seen")
     .in("id", otherIds);
   const profById = new Map(
     ((profs ?? []) as ProfileRow[]).map((p) => [p.id, p])
@@ -503,7 +503,7 @@ export async function searchUsers(
   const pattern = `%${q.replace(/[%_]/g, "")}%`;
   const { data, error } = await sb
     .from("profiles")
-    .select("id, name, username, avatar, color, official")
+    .select("id, name, username, avatar, color")
     .or(`name.ilike.${pattern},username.ilike.${pattern}`)
     .neq("id", selfId)
     .limit(30);
@@ -721,7 +721,7 @@ export async function loadUserProfile(
   try {
     const { data } = await getSupabase()
       .from("profiles")
-      .select("id, name, username, avatar, color, bio, last_seen, official")
+      .select("id, name, username, avatar, color, bio, last_seen")
       .eq("id", userId)
       .maybeSingle();
     if (!data) return null;

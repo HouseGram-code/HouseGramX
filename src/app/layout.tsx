@@ -13,6 +13,7 @@ import { ProfileProvider } from "@/lib/profile-store";
 import { ContactsProvider } from "@/lib/contacts-store";
 import { CallsProvider } from "@/lib/calls-store";
 import { PeerCallProvider } from "@/lib/peer-call";
+import { GroupCallProvider } from "@/lib/group-call";
 import { PresenceProvider } from "@/lib/presence-store";
 import { ConnectionProvider } from "@/lib/connection-store";
 import { ToastProvider } from "@/components/Toast";
@@ -65,6 +66,7 @@ export default function RootLayout({
                         <ContactsProvider>
                           <CallsProvider>
                             <PeerCallProvider>
+                              <GroupCallProvider>
                               <PresenceProvider>
                                 <ConnectionProvider>
                                   <ToastProvider>
@@ -75,6 +77,7 @@ export default function RootLayout({
                                   </ToastProvider>
                                 </ConnectionProvider>
                               </PresenceProvider>
+                              </GroupCallProvider>
                             </PeerCallProvider>
                           </CallsProvider>
                         </ContactsProvider>

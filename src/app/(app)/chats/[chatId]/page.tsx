@@ -41,6 +41,7 @@ import { AttachSheet } from "@/components/AttachSheet";
 import { PopoverMenu } from "@/components/PopoverMenu";
 import { ActivityText, TypingBubble } from "@/components/TypingIndicator";
 import { useChats, canAdminDo, type Message } from "@/lib/chat-store";
+import { useGroupCall, useCallWatch } from "@/lib/group-call";
 import { useSettings } from "@/lib/settings-store";
 import { useStickers } from "@/lib/stickers-store";
 import { useProfile } from "@/lib/profile-store";
@@ -85,7 +86,6 @@ export default function ChatPage({
     forwardMessage,
     updateChannel,
     joinChat,
-    activeCall,
     clearHistory,
   } = useChats();
   const { useSticker, useEmoji } = useStickers();
@@ -93,6 +93,8 @@ export default function ChatPage({
   const { profile } = useProfile();
   const { isOnline } = usePresence();
   const s = useSettings();
+  const callWatch = useCallWatch(chatId);
+  const groupCall = useGroupCall();
 
   const [draft, setDraft] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -677,7 +679,7 @@ export default function ChatPage({
       )}
 
       {/* Баннер активного звонка в этой группе */}
-      {activeCall && activeCall.chatId === conv.id && (
+      {(callWatch.active || groupCall.activeChatId === conv.id) && (
         <button
           type="button"
           onClick={() => router.push(`/chats/${conv.id}/call`)}
@@ -703,12 +705,13 @@ export default function ChatPage({
               Идёт аудиозвонок
             </p>
             <p className="truncate text-[12px] text-muted">
-              {activeCall.participantIds.length} участник(ов) · нажмите, чтобы
-              вернуться
+              {callWatch.count} участник(ов) · нажмите, чтобы войти
             </p>
           </div>
           <span className="rounded-full bg-green-500 px-3 py-1 text-[12px] font-semibold text-white">
-            Вернуться
+            {groupCall.activeChatId === conv.id && groupCall.joined
+              ? "Вернуться"
+              : "Войти"}
           </span>
         </button>
       )}
@@ -1036,7 +1039,7 @@ export default function ChatPage({
             }}
             className="mt-1 w-full text-center text-[16px] font-semibold uppercase tracking-wide text-accent transition active:opacity-60"
           >
-            Разблокировать
+            Разб��окировать
           </button>
         </div>
       )}
@@ -1237,7 +1240,7 @@ export default function ChatPage({
                     },
                   },
                   {
-                    label: "На 4 часа",
+                    label: "��а 4 часа",
                     onClick: () => {
                       updateChannel(conv.id, {
                         muted: true,

@@ -371,26 +371,36 @@ export default function GroupInfoPage({
           )}
 
           {/* Владелец */}
-          <div className="flex items-center gap-3 px-4 py-2.5">
-            <Avatar
-              initials={owner ? owner.initials : initials}
-              color={owner ? owner.color : profile.color}
-              size={46}
-              src={owner ? undefined : profile.avatar || undefined}
-            />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[15px] font-semibold text-foreground">
-                {owner ? owner.name : profile.name}
+          {owner ? (
+            <div className="flex items-center gap-3 px-4 py-2.5">
+              <Avatar initials={owner.initials} color={owner.color} size={46} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] font-semibold text-foreground">
+                  {owner.name}
+                </span>
               </span>
-              <span className="block text-[13px] text-muted">
-                {owner ? "" : "Вы"}
+              <span className="shrink-0 text-[13px] text-muted">владелец</span>
+            </div>
+          ) : conv.isOwner ? (
+            <div className="flex items-center gap-3 px-4 py-2.5">
+              <Avatar
+                initials={initials}
+                color={profile.color}
+                size={46}
+                src={profile.avatar || undefined}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] font-semibold text-foreground">
+                  {profile.name}
+                </span>
+                <span className="block text-[13px] text-muted">Вы</span>
               </span>
-            </span>
-            <span className="shrink-0 text-[13px] text-muted">владелец</span>
-          </div>
+              <span className="shrink-0 text-[13px] text-muted">владелец</span>
+            </div>
+          ) : null}
 
-          {/* Вы (после передачи прав — обычный участник) */}
-          {owner && (
+          {/* Вы — обычный участник (если вы не владелец группы) */}
+          {!conv.isOwner && (
             <div className="flex items-center gap-3 border-t border-separator px-4 py-2.5">
               <Avatar
                 initials={initials}

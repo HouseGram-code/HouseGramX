@@ -350,3 +350,46 @@ create policy "media_auth_delete" on storage.objects
     bucket_id = 'media'
     and (storage.foldername(name))[1] = auth.uid()::text
   );
+
+-- ============================================================
+-- Групповые звонки: активные сессии участников.
+-- Каждый участник держит свою строку, пока находится в звонке.
+-- Используется для индикатора «Идёт звонок» и Realtime-обновлений.
+-- ============================================================
+create table if not exists public.call_sessions (
+  chat_id   text        not null references public.chats (id) on delete cascade,
+  user_id   uuid        not null references auth.users (id) on delete cascade,
+  name      text,
+  joined_at timestamptz not null default now(),
+  primary key (chat_id, user_id)
+);
+
+alter table public.call_sessions enable row level security;
+
+-- Любой аутентифицированный пользователь видит, кто сейчас в звонке.
+do $$ begin
+  create policy "call_sessions_select" on public.call_sessions
+    for select to authenticated using (true);
+exception when duplicate_object then null; end $$;
+
+-- Управлять можно только своей строкой участия.
+do $$ begin
+  create policy "call_sessions_insert_own" on public.call_sessions
+    for insert to authenticated with check (auth.uid() = user_id);
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create policy "call_sessions_update_own" on public.call_sessions
+    for update to authenticated using (auth.uid() = user_id);
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create policy "call_sessions_delete_own" on public.call_sessions
+    for delete to authenticated using (auth.uid() = user_id);
+exception when duplicate_object then null; end $$;
+
+-- Realtime для индикатора активного звонка.
+do $$
+begin
+  begin execute 'alter publication supabase_realtime add table public.call_sessions'; exception when duplicate_object then null; end;
+end $$;
