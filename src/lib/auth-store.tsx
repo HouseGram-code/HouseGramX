@@ -63,9 +63,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session);
       setUser(data.session?.user ?? null);
       setSyncUser(data.session?.user?.id ?? null);
-      // КРИТИЧНО: пробрасываем JWT в Realtime, иначе при включённом RLS
-      // события postgres_changes (живые сообщения, баннер звонка) не приходят.
-      supabase.realtime.setAuth(data.session?.access_token ?? null);
+      // Пробрасываем JWT в Realtime, иначе при включённом RLS события
+      // postgres_changes (живые сообщения, баннер звонка) не приходят.
+      // Безопасно: этот вызов никогда не должен ронять приложение.
+      const token = data.session?.access_token;
+      if (token) {
+        try {
+          Promise.resolve(supabase.realtime?.setAuth(token)).catch(() => {});
+        } catch {
+          /* realtime auth не критичен для рендера */
+        }
+      }
       setReady(true);
     });
 
@@ -75,8 +83,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(newSession);
       setUser(newSession?.user ?? null);
       setSyncUser(newSession?.user?.id ?? null);
-      // Обновляем токен Realtime при любом изменении сессии (вход/рефреш/выход).
-      supabase.realtime.setAuth(newSession?.access_token ?? null);
+      // Обновляем токен Realtime при любом изменении сессии (вход/рефреш).
+      const t = newSession?.access_token;
+      if (t) {
+        try {
+          Promise.resolve(supabase.realtime?.setAuth(t)).catch(() => {});
+        } catch {
+          /* realtime auth не критичен для рендера */
+        }
+      }
     });
 
     return () => subscription.unsubscribe();
