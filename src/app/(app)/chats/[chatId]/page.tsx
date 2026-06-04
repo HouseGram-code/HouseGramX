@@ -42,6 +42,7 @@ import { PopoverMenu } from "@/components/PopoverMenu";
 import { ActivityText, TypingBubble } from "@/components/TypingIndicator";
 import { useChats, canAdminDo, type Message } from "@/lib/chat-store";
 import { useGroupCall, useCallWatch } from "@/lib/group-call";
+import { useChatTyping } from "@/lib/typing";
 import { useSettings } from "@/lib/settings-store";
 import { useStickers } from "@/lib/stickers-store";
 import { useProfile } from "@/lib/profile-store";
@@ -68,6 +69,7 @@ export default function ChatPage({
   params: Promise<{ chatId: string }>;
 }) {
   const { chatId } = use(params);
+  const typing = useChatTyping(chatId);
   const router = useRouter();
   const searchParams = useSearchParams();
   const {
@@ -174,6 +176,10 @@ export default function ChatPage({
   const isGroup = conv.kind === "group";
   const isBot = conv.kind === "bot";
   const isPrivate = conv.kind === "private";
+
+  // Реальные печатающие участники (Supabase Realtime).
+  const someoneTyping = typing.typers.length > 0;
+  const typingNames = typing.typers.map((t) => t.name).join(", ");
   const iBlockedPeer = !!conv.blocked; // я заблокировал собеседника
   const peerBlockedMe = !!conv.peerBlockedMe; // собеседник заблокировал меня
   // Скрываем аватар/статус собеседника, только если ОН заблокировал меня.
@@ -213,6 +219,7 @@ export default function ChatPage({
       sendText(conv.id, draft, { replyTo: replyTo ?? undefined });
       setReplyTo(null);
     }
+    typing.stopTyping();
     setDraft("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
   };
@@ -479,7 +486,11 @@ export default function ChatPage({
                     {subsLabel(conv.subscribers ?? 1)}
                   </span>
                 ) : isGroup ? (
-                  <span className="text-muted">{groupSubtitle}</span>
+                  someoneTyping ? (
+                    <ActivityText activity="typing" name={typingNames} />
+                  ) : (
+                    <span className="text-muted">{groupSubtitle}</span>
+                  )
                 ) : isBot ? (
                   conv.activity ? (
                     <ActivityText activity={conv.activity} />
@@ -488,8 +499,8 @@ export default function ChatPage({
                   )
                 ) : peerBlockedMe ? (
                   <span className="text-muted">бы��(а) давно</span>
-                ) : conv.activity ? (
-                  <ActivityText activity={conv.activity} />
+                ) : conv.activity || someoneTyping ? (
+                  <ActivityText activity={conv.activity ?? "typing"} />
                 ) : peerOnline ? (
                   <span className="text-green-500">в сети</span>
                 ) : (
@@ -922,7 +933,12 @@ export default function ChatPage({
         {/* Индикатор активности собеседника */}
         {!isChannel && !selectMode && (
           <AnimatePresence>
-            {conv.activity && <TypingBubble activity={conv.activity} />}
+            {(conv.activity || someoneTyping) && (
+              <TypingBubble
+                activity={someoneTyping ? "typing" : conv.activity}
+                name={isGroup && someoneTyping ? typingNames : undefined}
+              />
+            )}
           </AnimatePresence>
         )}
       </div>
@@ -1143,6 +1159,7 @@ export default function ChatPage({
                   value={draft}
                   onChange={(e) => {
                     setDraft(e.target.value);
+                    if (e.target.value.trim()) typing.notifyTyping();
                     e.target.style.height = "auto";
                     e.target.style.height =
                       Math.min(e.target.scrollHeight, 120) + "px";

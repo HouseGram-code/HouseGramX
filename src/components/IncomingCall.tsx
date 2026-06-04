@@ -6,15 +6,14 @@ import { usePeerCall } from "@/lib/peer-call";
 
 /** Глобальный оверлей входящего и активного 1-на-1 звонка. */
 export function IncomingCall() {
-  const { state, peerId, seconds, muted, answer, hangup, toggleMute } =
+  const { state, peerName, seconds, muted, answer, hangup, toggleMute } =
     usePeerCall();
 
   const show = state === "incoming" || state === "active" || state === "calling";
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
   const ss = String(seconds % 60).padStart(2, "0");
 
-  // Имя из peer-id (обрезаем префикс)
-  const name = peerId?.replace(/^msgr-/, "") ?? "Контакт";
+  const name = peerName ?? "Контакт";
 
   return (
     <AnimatePresence>

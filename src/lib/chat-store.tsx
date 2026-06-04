@@ -40,6 +40,42 @@ export type MediaKind = "image" | "video" | "audio" | "file";
 /** Текущая активность собеседника. */
 export type Activity = "typing" | "sticker" | null;
 
+/** Инициалы из имени (для аватарки отправителя в группах). */
+function senderInitialsFrom(name: string): string {
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+/** Данные текущего пользователя для подписи сообщения в группе. */
+function mySenderInfo(): {
+  name: string;
+  color: string;
+  initials: string;
+} | null {
+  try {
+    const raw = localStorage.getItem("messenger.profile.v1");
+    if (!raw) return null;
+    const p = JSON.parse(raw) as {
+      name?: string;
+      username?: string;
+      color?: string;
+    };
+    const name = p.name || p.username || "Вы";
+    return {
+      name,
+      color: p.color || "#888",
+      initials: senderInitialsFrom(name),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export interface Message {
   id: string;
   author: "me" | "them";
@@ -748,8 +784,23 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   ) => {
     const userId = me();
     const useCloud = !!userId && isSupabaseConfigured;
+    // Подпись отправителя (имя/инициалы/цвет) для групп — чтобы у участников
+    // показывались имя и аватарка, а не «?».
+    const sender = mySenderInfo();
     const built: Message[] = msgs.map((m) => ({
       ...m,
+      senderName:
+        m.author === "me" && !m.senderName && sender
+          ? sender.name
+          : m.senderName,
+      senderColor:
+        m.author === "me" && !m.senderColor && sender
+          ? sender.color
+          : m.senderColor,
+      senderInitials:
+        m.author === "me" && !m.senderInitials && sender
+          ? sender.initials
+          : m.senderInitials,
       id: uid(),
       time: nowTime(),
       ts: Date.now(),

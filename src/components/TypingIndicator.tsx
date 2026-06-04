@@ -3,20 +3,27 @@
 import { motion } from "motion/react";
 import type { Activity } from "@/lib/chat-store";
 
-/** Текстовый индикатор активности в шапке: «печатает...» / «выбирает стикер...». */
-export function ActivityText({ activity }: { activity: Activity }) {
+/** Текстовый индикатор активности в шапке: «печатает...» / «выбирает стикер...».
+ * Для групп можно передать name — тогда показывается «Имя печатает…». */
+export function ActivityText({
+  activity,
+  name,
+}: {
+  activity: Activity;
+  name?: string;
+}) {
   if (!activity) return null;
   if (activity === "sticker") {
     return (
       <span className="flex items-center gap-1.5 text-accent">
         <AnimatedEyes size={14} />
-        выбирает стикер
+        {name ? `${name} выбирает стикер` : "выбирает стикер"}
       </span>
     );
   }
   return (
     <span className="flex items-center gap-1 text-accent">
-      печатает
+      {name ? `${name} печатает` : "печатает"}
       <Dots />
     </span>
   );
@@ -43,8 +50,14 @@ function Dots() {
   );
 }
 
-/** Пузырёк активности в ленте сообщений. */
-export function TypingBubble({ activity }: { activity: Activity }) {
+/** Пузырёк активности в ленте сообщений. Для групп можно передать name. */
+export function TypingBubble({
+  activity,
+  name,
+}: {
+  activity: Activity;
+  name?: string;
+}) {
   if (!activity) return null;
   return (
     <motion.div
@@ -74,7 +87,13 @@ export function TypingBubble({ activity }: { activity: Activity }) {
           </span>
         )}
         <span className="text-[12px] text-muted">
-          {activity === "sticker" ? "выбирает стикер…" : "печатает…"}
+          {activity === "sticker"
+            ? name
+              ? `${name} выбирает стикер…`
+              : "выбирает стикер…"
+            : name
+              ? `${name} печатает…`
+              : "печатает…"}
         </span>
       </div>
     </motion.div>

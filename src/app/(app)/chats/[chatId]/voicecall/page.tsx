@@ -11,8 +11,7 @@ import {
 } from "@phosphor-icons/react";
 import { Avatar } from "@/components/Avatar";
 import { useChats } from "@/lib/chat-store";
-import { useContacts } from "@/lib/contacts-store";
-import { usePeerCall, toPeerId } from "@/lib/peer-call";
+import { usePeerCall } from "@/lib/peer-call";
 import { useCalls } from "@/lib/calls-store";
 
 export default function VoiceCallPage({
@@ -23,20 +22,22 @@ export default function VoiceCallPage({
   const { chatId } = use(params);
   const router = useRouter();
   const { getConversation } = useChats();
-  const { getContact } = useContacts();
   const { logCall } = useCalls();
   const { ready, state, muted, seconds, call, hangup, toggleMute } =
     usePeerCall();
 
   const conv = getConversation(chatId);
-  // peer-id собеседника = из его имени контакта (демо). В реале — постоянный id.
-  const contact = conv ? getContact(conv.id) : undefined;
-  const remoteId = toPeerId(contact?.name ?? conv?.title ?? chatId);
 
-  // Автозвонок при открытии
+  // Автозвонок при открытии — реальный вызов по auth-id собеседника.
   useEffect(() => {
-    if (ready && state === "idle" && conv) {
-      call(remoteId).catch(() => {});
+    if (ready && state === "idle" && conv && conv.peerId) {
+      call({
+        id: conv.peerId,
+        name: conv.title,
+        color: conv.color,
+        initials: conv.initials,
+        avatar: conv.avatar,
+      }).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
