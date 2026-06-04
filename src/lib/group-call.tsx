@@ -618,8 +618,20 @@ export function useCallWatch(chatId: string | null): {
       )
       .subscribe();
 
+    // Запасной опрос: если realtime-событие по call_sessions не дошло
+    // (например, клиент уже был в чате, когда начался звонок) — всё равно
+    // обновляем счётчик раз в несколько секунд, чтобы баннер «Идёт
+    // аудиозвонок» гарантированно появился у всех.
+    const poll = window.setInterval(() => void refresh(), 4000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
       cancelled = true;
+      window.clearInterval(poll);
+      document.removeEventListener("visibilitychange", onVisible);
       sb.removeChannel(channel);
     };
   }, [chatId]);

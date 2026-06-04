@@ -561,19 +561,46 @@ export async function openDirectChat(
         subscribers: 2,
       })
     );
+    // ВАЖНО: последовательно. RLS members_insert разрешает добавить ЧУЖУЮ
+    // строку только админу/владельцу чата. Поэтому сначала вставляем себя
+    // как owner (это коммитится), и только потом — собеседника. Иначе один
+    // общий upsert-массив отклоняется целиком, и у лички нет участников →
+    // can_read_messages = false → сообщения не пишутся и не доходят до 2-го.
     await run(
-      "dmMembers",
-      sb.from("chat_members").upsert([
-        { chat_id: id, user_id: me, role: "member" },
-        { chat_id: id, user_id: other.id, role: "member" },
-      ])
+      "dmOwner",
+      sb
+        .from("chat_members")
+        .upsert({ chat_id: id, user_id: me, role: "owner" })
+    );
+    await run(
+      "dmPeer",
+      sb
+        .from("chat_members")
+        .upsert({ chat_id: id, user_id: other.id, role: "member" })
     );
   } else {
-    // На случай, если членство отсутствует (старый чат) — добавим себя.
+    // Ремонт старых чатов, созданных до фикса: гарантируем, что ОБА
+    // участника есть в chat_members (иначе RLS не пускает сообщения).
+    // Сначала становимся owner — иначе нельзя добавить чужую строку.
     await run(
       "dmSelfMember",
-      sb.from("chat_members").upsert({ chat_id: id, user_id: me, role: "member" })
+      sb.from("chat_members").upsert({ chat_id: id, user_id: me, role: "owner" })
     );
+    const { data: mem } = await sb
+      .from("chat_members")
+      .select("user_id")
+      .eq("chat_id", id);
+    const havePeer = ((mem ?? []) as { user_id: string }[]).some(
+      (r) => r.user_id === other.id
+    );
+    if (!havePeer) {
+      await run(
+        "dmPeerRepair",
+        sb
+          .from("chat_members")
+          .upsert({ chat_id: id, user_id: other.id, role: "member" })
+      );
+    }
   }
 
   // Грузим сообщения.
