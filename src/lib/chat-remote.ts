@@ -350,7 +350,7 @@ async function resolveDirectChats(
   }
 }
 
-/** Загружает один публичный чат по id (для открытия по ссылке). */
+/** Загружает один публичный чат по id (для открытия по ссылк��). */
 export async function loadChatById(
   id: string,
   uid: string | null
@@ -540,18 +540,14 @@ export async function openDirectChat(
   const sb = getSupabase();
   const id = directChatId(me, other.id);
 
-  // Чат уже есть?
-  const { data: existing } = await sb
-    .from("chats")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (!existing) {
-    // Создаём чат и обоих участников.
-    await run(
-      "createDM",
-      sb.from("chats").insert({
+  // Создаём чат при необходимости. НЕ полагаемся на предварительный SELECT:
+  // из-за RLS пользователь, который ещё не участник, НЕ видит уже
+  // существующий чат и ошибочно пытается создать его заново → 409 Conflict
+  // (duplicate key chats_pkey). ignoreDuplicates → ON CONFLICT DO NOTHING.
+  await run(
+    "createDM",
+    sb.from("chats").upsert(
+      {
         id,
         kind: "private",
         title: other.name,
@@ -559,48 +555,43 @@ export async function openDirectChat(
         initials: other.initials,
         owner_id: me,
         subscribers: 2,
-      })
-    );
-    // ВАЖНО: последовательно. RLS members_insert разрешает добавить ЧУЖУЮ
-    // строку только админу/владельцу чата. Поэтому сначала вставляем себя
-    // как owner (это коммитится), и только потом — собеседника. Иначе один
-    // общий upsert-массив отклоняется целиком, и у лички нет участников →
-    // can_read_messages = false → сообщения не пишутся и не доходят до 2-го.
-    await run(
-      "dmOwner",
-      sb
-        .from("chat_members")
-        .upsert({ chat_id: id, user_id: me, role: "owner" })
-    );
+      },
+      { onConflict: "id", ignoreDuplicates: true }
+    )
+  );
+
+  // Гарантируем своё членство (owner — чтобы иметь право добавить
+  // собеседника). RLS members_insert разрешает свою строку (user_id = auth.uid()).
+  await run(
+    "dmSelf",
+    sb
+      .from("chat_members")
+      .upsert(
+        { chat_id: id, user_id: me, role: "owner" },
+        { onConflict: "chat_id,user_id" }
+      )
+  );
+
+  // Добавляем собеседника, только если его ещё нет (не понижаем роль
+  // существующего). Теперь мы owner → is_chat_admin = true → RLS пропускает
+  // чужую строку. Это же чинит старые «битые» лички без участников.
+  const { data: mem } = await sb
+    .from("chat_members")
+    .select("user_id")
+    .eq("chat_id", id);
+  const havePeer = ((mem ?? []) as { user_id: string }[]).some(
+    (r) => r.user_id === other.id
+  );
+  if (!havePeer) {
     await run(
       "dmPeer",
       sb
         .from("chat_members")
-        .upsert({ chat_id: id, user_id: other.id, role: "member" })
+        .upsert(
+          { chat_id: id, user_id: other.id, role: "member" },
+          { onConflict: "chat_id,user_id", ignoreDuplicates: true }
+        )
     );
-  } else {
-    // Ремонт старых чатов, созданных до фикса: гарантируем, что ОБА
-    // участника есть в chat_members (иначе RLS не пускает сообщения).
-    // Сначала становимся owner — иначе нельзя добавить чужую строку.
-    await run(
-      "dmSelfMember",
-      sb.from("chat_members").upsert({ chat_id: id, user_id: me, role: "owner" })
-    );
-    const { data: mem } = await sb
-      .from("chat_members")
-      .select("user_id")
-      .eq("chat_id", id);
-    const havePeer = ((mem ?? []) as { user_id: string }[]).some(
-      (r) => r.user_id === other.id
-    );
-    if (!havePeer) {
-      await run(
-        "dmPeerRepair",
-        sb
-          .from("chat_members")
-          .upsert({ chat_id: id, user_id: other.id, role: "member" })
-      );
-    }
   }
 
   // Грузим сообщения.

@@ -10,6 +10,7 @@ import {
 import type { Session, User } from "@supabase/supabase-js";
 import { getSupabase, isSupabaseConfigured } from "./supabase";
 import { setSyncUser, clearAppCache } from "./sync";
+import { isAdminEmail } from "./admin";
 
 interface AuthResult {
   ok: boolean;
@@ -50,6 +51,24 @@ function ruError(message: string): string {
   return message;
 }
 
+/**
+ * Записывает флаг официального аккаунта (галочку) в БД для админ-
+ * аккаунта, чтобы галочку видели ВСЕ пользователи (читается из
+ * profiles.official). Иначе админ видит галочку только локально
+ * (isAdminEmail), а в БД она не сохраняется. Идемпотентно и безопасно:
+ * никогда не роняет приложение.
+ */
+function syncOfficialFlag(u: User | null): void {
+  if (!u || !isAdminEmail(u.email)) return;
+  try {
+    Promise.resolve(
+      getSupabase().from("profiles").update({ official: true }).eq("id", u.id)
+    ).catch(() => {});
+  } catch {
+    /* не критично для рендера */
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -63,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session);
       setUser(data.session?.user ?? null);
       setSyncUser(data.session?.user?.id ?? null);
+      syncOfficialFlag(data.session?.user ?? null);
       // Пробрасываем JWT в Realtime, иначе при включённом RLS события
       // postgres_changes (живые сообщения, баннер звонка) не приходят.
       // Безопасно: этот вызов никогда не должен ронять приложение.
@@ -83,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(newSession);
       setUser(newSession?.user ?? null);
       setSyncUser(newSession?.user?.id ?? null);
+      syncOfficialFlag(newSession?.user ?? null);
       // Обновляем токен Realtime при любом изменении сессии (вход/рефреш).
       const t = newSession?.access_token;
       if (t) {
@@ -127,6 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: name ?? "",
           username: extra?.username ?? "",
           avatar: extra?.avatar ?? "",
+          official: isAdminEmail(email),
           updated_at: new Date().toISOString(),
         });
         // Нарушение уникального индекса username → имя уже занято.
