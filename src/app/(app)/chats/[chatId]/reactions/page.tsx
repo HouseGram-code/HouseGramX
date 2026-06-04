@@ -1,6 +1,7 @@
 "use client";
 
-import { use } from "react";
+import { use, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { SubScreen } from "@/components/SubScreen";
 import { Group, GroupHint, SectionTitle } from "@/components/settings-ui";
 import { Switch } from "@/components/Switch";
@@ -26,10 +27,17 @@ export default function ChannelReactionsPage({
   params: Promise<{ chatId: string }>;
 }) {
   const { chatId } = use(params);
+  const router = useRouter();
   const { getConversation, updateChannel } = useChats();
   const conv = getConversation(chatId);
 
+  // Управлять реакциями может только владелец группы.
+  useEffect(() => {
+    if (conv && !conv.isOwner) router.replace(`/chats/${chatId}/group`);
+  }, [conv, chatId, router]);
+
   if (!conv) return <SubScreen title="Не найдено">{null}</SubScreen>;
+  if (!conv.isOwner) return null;
 
   const enabled = conv.reactionsEnabled ?? true;
   const count = conv.reactionsCount ?? 8;

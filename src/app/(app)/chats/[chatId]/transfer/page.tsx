@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MagnifyingGlass, Crown, ShieldCheck } from "@phosphor-icons/react";
 import { SubScreen } from "@/components/SubScreen";
@@ -28,6 +28,11 @@ export default function TransferOwnershipPage({
   const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
 
   const conv = getConversation(chatId);
+
+  // Передавать права владельца может только сам владелец.
+  useEffect(() => {
+    if (conv && !conv.isOwner) router.replace(`/chats/${chatId}/group`);
+  }, [conv, chatId, router]);
 
   // Кандидаты на роль владельца: сначала администраторы, затем участники.
   const candidates = useMemo(() => {

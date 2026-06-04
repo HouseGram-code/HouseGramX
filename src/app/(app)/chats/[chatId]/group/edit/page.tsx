@@ -45,6 +45,11 @@ export default function GroupEditPage({
     }
   }, [conv]);
 
+  // Настройки группы — только для владельца. Остальных возвращаем к инфо группы.
+  useEffect(() => {
+    if (conv && !conv.isOwner) router.replace(`/chats/${chatId}/group`);
+  }, [conv, chatId, router]);
+
   if (!conv) {
     return (
       <div className="flex h-full flex-1 items-center justify-center bg-background">
@@ -52,6 +57,8 @@ export default function GroupEditPage({
       </div>
     );
   }
+
+  if (!conv.isOwner) return null;
 
   const save = () => {
     updateChannel(chatId, {

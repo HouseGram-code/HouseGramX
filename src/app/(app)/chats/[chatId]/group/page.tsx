@@ -90,7 +90,9 @@ export default function GroupInfoPage({
   const adminsCount = 1 + (conv.adminIds?.length ?? 0);
   // Если права переданы другому участнику — показываем его как владельца.
   const owner = conv.ownerId ? getContact(conv.ownerId) : undefined;
-  const canEditInfo = canMemberDo(conv, "editInfo");
+  // Настройки группы (шестерёнка) — реакции, разрешения, передача прав,
+  // удаление — доступны только владельцу. Обычный участник их не видит.
+  const canOpenSettings = conv.isOwner ?? false;
   const canAddMembers = canMemberDo(conv, "addMembers");
   const canInvite = canMemberDo(conv, "invite");
 
@@ -106,7 +108,7 @@ export default function GroupInfoPage({
           <CaretLeft size={26} weight="bold" />
         </button>
         <div className="relative">
-          {canEditInfo && (
+          {canOpenSettings && (
             <button
               type="button"
               aria-label="Настройки чата"
@@ -164,7 +166,7 @@ export default function GroupInfoPage({
                 onClick: () =>
                   setConfirm({
                     title: "Очистить историю чата?",
-                    message: "Восстановить сообщения не получится",
+                    message: "Восстановить сообщения не получитс��",
                     confirmLabel: "Очистить у всех",
                     danger: true,
                     onConfirm: () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   DeviceMobile,
@@ -11,62 +11,92 @@ import {
 import { SubScreen } from "@/components/SubScreen";
 import { Group, GroupHint, SectionTitle } from "@/components/settings-ui";
 import { useToast } from "@/components/Toast";
+import { useAuth } from "@/lib/auth-store";
+import {
+  listSessions,
+  removeSession,
+  removeOtherSessions,
+  registerSession,
+  type DeviceSession,
+} from "@/lib/device-sessions";
 
-interface Device {
-  id: string;
-  name: string;
-  meta: string;
-  current?: boolean;
-  icon: typeof DeviceMobile;
+const ICONS = {
+  mobile: DeviceMobile,
+  tablet: DeviceTabletSpeaker,
+  desktop: Desktop,
+} as const;
+
+const rowMotion = {
+  initial: { opacity: 0, height: 0 },
+  animate: { opacity: 1, height: "auto" },
+  exit: { opacity: 0, height: 0 },
+};
+
+function lastSeenLabel(ts: number, current: boolean): string {
+  if (current) return "Это устройство";
+  if (!ts) return "Активный сеанс";
+  const diff = Date.now() - ts;
+  const min = Math.floor(diff / 60000);
+  if (min < 2) return "Был(а) в сети только что";
+  if (min < 60) return `Был(а) в сети ${min} мин назад`;
+  const hrs = Math.floor(min / 60);
+  if (hrs < 24) return `Был(а) в сети ${hrs} ч назад`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return "Был(а) в сети вчера";
+  return `Был(а) в сети ${days} дн. назад`;
 }
-
-const initialDevices: Device[] = [
-  {
-    id: "1",
-    name: "iPhone 17 Pro",
-    meta: "Это устройство · Москва",
-    current: true,
-    icon: DeviceMobile,
-  },
-  {
-    id: "2",
-    name: "MacBook Pro",
-    meta: "Был в сети сегодня, 11:20",
-    icon: Desktop,
-  },
-  {
-    id: "3",
-    name: "iPad Air",
-    meta: "Был в сети вчера, 19:05",
-    icon: DeviceTabletSpeaker,
-  },
-];
 
 export default function DevicesPage() {
   const { show } = useToast();
-  const [devices, setDevices] = useState(initialDevices);
+  const { user } = useAuth();
+  const [devices, setDevices] = useState<DeviceSession[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const removeDevice = (id: string) => {
-    setDevices((d) => d.filter((x) => x.id !== id));
+  const refresh = useCallback(async () => {
+    const list = await listSessions(user?.id);
+    setDevices(list);
+    setLoading(false);
+  }, [user?.id]);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (user?.id) await registerSession(user.id);
+      if (!active) return;
+      await refresh();
+    })();
+    return () => {
+      active = false;
+    };
+  }, [user?.id, refresh]);
+
+  const removeOne = async (sessionId: string) => {
+    setDevices((d) => d.filter((x) => x.sessionId !== sessionId));
+    if (user?.id) await removeSession(user.id, sessionId);
     show("Сеанс завершён");
   };
 
-  const terminateAll = () => {
+  const terminateAll = async () => {
     setDevices((d) => d.filter((x) => x.current));
+    if (user?.id) await removeOtherSessions(user.id);
     show("Все прочие сеансы завершены");
   };
 
+  const current = devices.filter((d) => d.current);
   const others = devices.filter((d) => !d.current);
 
   return (
     <SubScreen title="Устройства">
       <SectionTitle>Текущее устройство</SectionTitle>
       <Group>
-        {devices
-          .filter((d) => d.current)
-          .map((d) => (
-            <DeviceItem key={d.id} device={d} last />
-          ))}
+        {current.map((d) => (
+          <DeviceItem key={d.sessionId} device={d} last />
+        ))}
+        {current.length === 0 && (
+          <div className="px-4 py-3 text-[15px] text-muted">
+            {loading ? "Загрузка…" : "Текущее устройство"}
+          </div>
+        )}
       </Group>
 
       {others.length > 0 && (
@@ -76,15 +106,15 @@ export default function DevicesPage() {
             <AnimatePresence initial={false}>
               {others.map((d, i) => (
                 <motion.div
-                  key={d.id}
+                  key={d.sessionId}
                   layout
-                  exit={{ opacity: 0, height: 0 }}
+                  {...rowMotion}
                   className="overflow-hidden"
                 >
                   <DeviceItem
                     device={d}
                     last={i === others.length - 1}
-                    onRemove={() => removeDevice(d.id)}
+                    onRemove={() => removeOne(d.sessionId)}
                   />
                 </motion.div>
               ))}
@@ -104,7 +134,7 @@ export default function DevicesPage() {
         </>
       )}
 
-      {others.length === 0 && (
+      {!loading && others.length === 0 && (
         <GroupHint>Других активных сеансов нет.</GroupHint>
       )}
     </SubScreen>
@@ -116,11 +146,11 @@ function DeviceItem({
   last,
   onRemove,
 }: {
-  device: Device;
+  device: DeviceSession;
   last?: boolean;
   onRemove?: () => void;
 }) {
-  const Icon = device.icon;
+  const Icon = ICONS[device.platform] ?? Desktop;
   return (
     <div className="flex items-center gap-3 pl-4">
       <Icon size={26} weight="regular" className="shrink-0 text-muted" />
@@ -130,8 +160,12 @@ function DeviceItem({
         }`}
       >
         <div className="min-w-0">
-          <p className="truncate text-[15px] text-foreground">{device.name}</p>
-          <p className="truncate text-[13px] text-muted">{device.meta}</p>
+          <p className="truncate text-[15px] text-foreground">
+            {device.deviceName}
+          </p>
+          <p className="truncate text-[13px] text-muted">
+            {lastSeenLabel(device.lastSeen, device.current)}
+          </p>
         </div>
         {onRemove && (
           <button

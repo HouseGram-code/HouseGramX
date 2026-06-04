@@ -6,13 +6,11 @@ import {
   Copy,
   DotsThreeVertical,
   ShareNetwork,
-  ShareFat,
   QrCode,
   UserCheck,
 } from "@phosphor-icons/react";
 import { SubScreen } from "@/components/SubScreen";
 import { Avatar } from "@/components/Avatar";
-import { ForwardSheet } from "@/components/ForwardSheet";
 import { Group, GroupHint, SectionTitle } from "@/components/settings-ui";
 import { Switch } from "@/components/Switch";
 import { useContacts } from "@/lib/contacts-store";
@@ -31,7 +29,6 @@ export default function ChannelInvitePage({
   const { getContact } = useContacts();
   const { show } = useToast();
   const [link, setLink] = useState("");
-  const [forwardOpen, setForwardOpen] = useState(false);
 
   const conv = getConversation(chatId);
 
@@ -99,11 +96,6 @@ export default function ChannelInvitePage({
 
       <div className="mt-4 px-3">
         <Group>
-          <ActionRow
-            icon={ShareFat}
-            label="Отправить в MAX"
-            onClick={() => setForwardOpen(true)}
-          />
           <ActionRow
             icon={ShareNetwork}
             label="Поделиться ссылкой"
@@ -185,11 +177,6 @@ export default function ChannelInvitePage({
         </>
       )}
 
-      <ForwardSheet
-        open={forwardOpen}
-        onClose={() => setForwardOpen(false)}
-        onPick={() => show("Приглашение отправлено")}
-      />
     </SubScreen>
   );
 }
@@ -200,7 +187,7 @@ function ActionRow({
   onClick,
   last,
 }: {
-  icon: typeof ShareFat;
+  icon: typeof ShareNetwork;
   label: string;
   onClick: () => void;
   last?: boolean;

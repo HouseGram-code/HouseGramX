@@ -393,3 +393,41 @@ do $$
 begin
   begin execute 'alter publication supabase_realtime add table public.call_sessions'; exception when duplicate_object then null; end;
 end $$;
+
+-- ============================================================
+-- Сессии устройств (реальные активные сеансы)
+-- Каждый браузер/устройство держит свою строку с last_seen.
+-- Используется на экране «Устройства» в настройках.
+-- ============================================================
+create table if not exists public.device_sessions (
+  user_id     uuid        not null references auth.users (id) on delete cascade,
+  session_id  text        not null,
+  device_name text,
+  platform    text,
+  last_seen   timestamptz not null default now(),
+  created_at  timestamptz not null default now(),
+  primary key (user_id, session_id)
+);
+
+alter table public.device_sessions enable row level security;
+
+-- Пользователь видит и управляет только своими сеансами.
+do $$ begin
+  create policy "device_sessions_select_own" on public.device_sessions
+    for select to authenticated using (auth.uid() = user_id);
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create policy "device_sessions_insert_own" on public.device_sessions
+    for insert to authenticated with check (auth.uid() = user_id);
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create policy "device_sessions_update_own" on public.device_sessions
+    for update to authenticated using (auth.uid() = user_id);
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create policy "device_sessions_delete_own" on public.device_sessions
+    for delete to authenticated using (auth.uid() = user_id);
+exception when duplicate_object then null; end $$;

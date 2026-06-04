@@ -1,6 +1,7 @@
 "use client";
 
-import { use } from "react";
+import { use, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   MagicWand,
   UserPlus,
@@ -34,10 +35,17 @@ export default function MemberPermissionsPage({
   params: Promise<{ chatId: string }>;
 }) {
   const { chatId } = use(params);
+  const router = useRouter();
   const { getConversation, setMemberPerm } = useChats();
   const conv = getConversation(chatId);
 
+  // Настраивать разрешения участников может только владелец.
+  useEffect(() => {
+    if (conv && !conv.isOwner) router.replace(`/chats/${chatId}/group`);
+  }, [conv, chatId, router]);
+
   if (!conv) return <SubScreen title="Не найдено">{null}</SubScreen>;
+  if (!conv.isOwner) return null;
 
   const perms = conv.memberPerms ?? DEFAULT_MEMBER_PERMS;
 

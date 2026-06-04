@@ -1,6 +1,7 @@
 import { BottomNav } from "@/components/BottomNav";
 import { SideNav } from "@/components/SideNav";
 import { IncomingCall } from "@/components/IncomingCall";
+import { SessionTracker } from "@/components/SessionTracker";
 
 export default function AppLayout({
   children,
@@ -11,6 +12,9 @@ export default function AppLayout({
     <div className="flex h-dvh w-full overflow-hidden">
       {/* Глобальный оверлей входящего/активного звонка */}
       <IncomingCall />
+
+      {/* Регистрация реального сеанса этого устройства */}
+      <SessionTracker />
 
       {/* Боковая навигация — ПК/планшет */}
       <SideNav />
