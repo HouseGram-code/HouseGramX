@@ -15,6 +15,7 @@ import {
 import { Avatar } from "@/components/Avatar";
 import { PopoverMenu } from "@/components/PopoverMenu";
 import { useChats, type Conversation } from "@/lib/chat-store";
+import { useActiveCallChats } from "@/lib/group-call";
 import { countUnread } from "@/lib/chat-remote";
 import { usePresence } from "@/lib/presence-store";
 import { ConnectionTitle } from "@/components/ConnectionTitle";
@@ -66,6 +67,13 @@ export default function ChatsPage() {
   const router = useRouter();
   const { conversations, activeCall } = useChats();
   const { isOnline } = usePresence();
+  // Чаты, в которых прямо сейчас идёт групповой звонок (у любого
+  // участника), чтобы показать индикатор «Идёт звонок» в списке.
+  const callChatIds = useMemo(
+    () => conversations.map((c) => c.id),
+    [conversations]
+  );
+  const activeCallChats = useActiveCallChats(callChatIds);
   const [filter, setFilter] = useState<ChatFilter>("all");
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -219,7 +227,8 @@ export default function ChatsPage() {
                         className="shrink-0 text-muted-2"
                       />
                     )}
-                    {activeCall?.chatId === conv.id && (
+                    {(activeCall?.chatId === conv.id ||
+                      activeCallChats.has(conv.id)) && (
                       <span className="flex shrink-0 items-end gap-[2px]">
                         {[0, 1, 2].map((i) => (
                           <motion.span

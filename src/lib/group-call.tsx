@@ -638,3 +638,63 @@ export function useCallWatch(chatId: string | null): {
 
   return { active: count > 0, count };
 }
+
+/**
+ * Следит за активными групповыми звонками сразу по списку чатов — для
+ * индикатора «Идёт звонок» в списке чатов (как в Telegram), чтобы другие
+ * участники видели звонок, даже не открывая чат. Realtime + опрос на случай,
+ * если postgres_changes по call_sessions не доставлены.
+ */
+export function useActiveCallChats(chatIds: string[]): Set<string> {
+  const [active, setActive] = useState<Set<string>>(() => new Set());
+  // Стабильный ключ зависимости, чтобы не пересоздавать подписку каждый рендер.
+  const key = chatIds.slice().sort().join(",");
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || chatIds.length === 0) {
+      setActive(new Set());
+      return;
+    }
+    const sb = getSupabase();
+    let cancelled = false;
+
+    const refresh = async () => {
+      const { data } = await sb
+        .from("call_sessions")
+        .select("chat_id")
+        .in("chat_id", chatIds);
+      if (cancelled) return;
+      const next = new Set<string>();
+      for (const r of (data ?? []) as { chat_id: string }[]) {
+        next.add(r.chat_id);
+      }
+      setActive(next);
+    };
+    void refresh();
+
+    const channel = sb
+      .channel("call-watch-list")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "call_sessions" },
+        () => void refresh()
+      )
+      .subscribe();
+
+    const poll = window.setInterval(() => void refresh(), 4000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(poll);
+      document.removeEventListener("visibilitychange", onVisible);
+      sb.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  return active;
+}
