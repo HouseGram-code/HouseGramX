@@ -63,6 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session);
       setUser(data.session?.user ?? null);
       setSyncUser(data.session?.user?.id ?? null);
+      // КРИТИЧНО: пробрасываем JWT в Realtime, иначе при включённом RLS
+      // события postgres_changes (живые сообщения, баннер звонка) не приходят.
+      supabase.realtime.setAuth(data.session?.access_token ?? null);
       setReady(true);
     });
 
@@ -72,6 +75,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(newSession);
       setUser(newSession?.user ?? null);
       setSyncUser(newSession?.user?.id ?? null);
+      // Обновляем токен Realtime при любом изменении сессии (вход/рефреш/выход).
+      supabase.realtime.setAuth(newSession?.access_token ?? null);
     });
 
     return () => subscription.unsubscribe();
