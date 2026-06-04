@@ -310,20 +310,18 @@ export default function GroupInfoPage({
           />
         </div>
 
-        {/* Администраторы — управление только для владельца */}
-        {canOpenSettings && (
-          <div className="mt-4 px-3">
-            <Card>
-              <Row
-                icon={UserCircleGear}
-                title="Администраторы"
-                value={String(adminsCount)}
-                onClick={() => router.push(`/chats/${chatId}/admins`)}
-                last
-              />
-            </Card>
-          </div>
-        )}
+        {/* Администраторы */}
+        <div className="mt-4 px-3">
+          <Card>
+            <Row
+              icon={UserCircleGear}
+              title="Администраторы"
+              value={String(adminsCount)}
+              onClick={() => router.push(`/chats/${chatId}/admins`)}
+              last
+            />
+          </Card>
+        </div>
 
         {/* Вло��ения */}
         <div className="mt-4 px-3">

@@ -13,15 +13,35 @@ import {
 } from "@/lib/chat-store";
 import { useToast } from "@/components/Toast";
 
-const GROUPS: { key: keyof AdminRights; label: string; hint?: string }[][] = [
-  [{ key: "edit", label: "Редактировать канал", hint: "Фото, название, описание" }],
+// Текст прав зависит от типа чата: в канале — «посты/подписчики», в группе — «сообщения/участники».
+const adminRightGroups = (
+  isChannel: boolean,
+): { key: keyof AdminRights; label: string; hint?: string }[][] => [
   [
-    { key: "post", label: "Писать посты" },
-    { key: "editPosts", label: "Редактировать чужие посты" },
-    { key: "deletePosts", label: "Удалять чужие посты" },
-    { key: "pin", label: "Закреплять посты" },
+    {
+      key: "edit",
+      label: isChannel ? "Редактировать канал" : "Редактировать группу",
+      hint: "Фото, название, описание",
+    },
   ],
-  [{ key: "members", label: "Добавлять и удалять подписчиков" }],
+  [
+    { key: "post", label: isChannel ? "Писать посты" : "Отправлять сообщения" },
+    {
+      key: "editPosts",
+      label: isChannel ? "Редактировать чужие посты" : "Редактировать чужие сообщения",
+    },
+    {
+      key: "deletePosts",
+      label: isChannel ? "Удалять чужие посты" : "Удалять чужие сообщения",
+    },
+    { key: "pin", label: isChannel ? "Закреплять посты" : "Закреплять сообщения" },
+  ],
+  [
+    {
+      key: "members",
+      label: isChannel ? "Добавлять и удалять подписчиков" : "Добавлять и удалять участников",
+    },
+  ],
   [{ key: "admins", label: "Назначать и удалять администраторов" }],
 ];
 
@@ -39,6 +59,7 @@ export default function AdminRightsPage({
   const conv = getConversation(chatId);
   const contact = getContact(userId);
   const rights = conv?.adminRights?.[userId] ?? DEFAULT_ADMIN_RIGHTS;
+  const GROUPS = adminRightGroups(conv?.kind === "channel");
 
   if (!conv || !contact) {
     return (

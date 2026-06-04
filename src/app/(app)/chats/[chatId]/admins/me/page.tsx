@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "@phosphor-icons/react";
 import { Avatar } from "@/components/Avatar";
 import { Switch } from "@/components/Switch";
 import { useProfile } from "@/lib/profile-store";
+import { useChats } from "@/lib/chat-store";
 
 interface Perm {
   key: string;
@@ -13,24 +14,50 @@ interface Perm {
   hint?: string;
 }
 
-const groups: Perm[][] = [
-  [{ key: "edit", label: "Редактировать канал", hint: "Фото, название, описание" }],
+// Текст прав зависит от типа чата: в канале — «посты/подписчики», в группе — «сообщения/участники».
+const ownerRightGroups = (isChannel: boolean): Perm[][] => [
   [
-    { key: "post", label: "Писать посты" },
-    { key: "editPosts", label: "Редактировать чужие посты" },
-    { key: "deletePosts", label: "Удалять чужие посты" },
-    { key: "pin", label: "Закреплять посты" },
+    {
+      key: "edit",
+      label: isChannel ? "Редактировать канал" : "Редактировать группу",
+      hint: "Фото, название, описание",
+    },
   ],
-  [{ key: "members", label: "Добавлять и удалять подписчиков" }],
+  [
+    { key: "post", label: isChannel ? "Писать посты" : "Отправлять сообщения" },
+    {
+      key: "editPosts",
+      label: isChannel ? "Редактировать чужие посты" : "Редактировать чужие сообщения",
+    },
+    {
+      key: "deletePosts",
+      label: isChannel ? "Удалять чужие посты" : "Удалять чужие сообщения",
+    },
+    { key: "pin", label: isChannel ? "Закреплять посты" : "Закреплять сообщения" },
+  ],
+  [
+    {
+      key: "members",
+      label: isChannel ? "Добавлять и удалять подписчиков" : "Добавлять и удалять участников",
+    },
+  ],
   [{ key: "admins", label: "Назначать и удалять администраторов" }],
 ];
 
-export default function AdminRightsPage() {
+export default function AdminRightsPage({
+  params,
+}: {
+  params: Promise<{ chatId: string }>;
+}) {
+  const { chatId } = use(params);
   const router = useRouter();
   const { profile, initials } = useProfile();
+  const { getConversation } = useChats();
+  const isChannel = getConversation(chatId)?.kind === "channel";
+  const groups = ownerRightGroups(isChannel);
   // Владелец: все права включены и заблокированы для изменения.
   const [perms] = useState<Record<string, boolean>>(
-    Object.fromEntries(groups.flat().map((p) => [p.key, true]))
+    Object.fromEntries(ownerRightGroups(isChannel).flat().map((p) => [p.key, true]))
   );
 
   return (
@@ -93,7 +120,7 @@ export default function AdminRightsPage() {
         ))}
 
         <p className="px-5 text-[13px] leading-relaxed text-muted">
-          Вы — владелец канала, у вас есть все права.
+          Вы — владелец {isChannel ? "канала" : "группы"}, у вас есть все права.
         </p>
       </div>
     </div>

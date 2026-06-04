@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -35,13 +35,7 @@ export default function AdminsPage({
   const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
   const conv = getConversation(chatId);
 
-  // Управлять администраторами может только владелец группы.
-  useEffect(() => {
-    if (conv && !conv.isOwner) router.replace(`/chats/${chatId}/group`);
-  }, [conv, chatId, router]);
-
   if (!conv) return <SubScreen title="Не найдено">{null}</SubScreen>;
-  if (!conv.isOwner) return null;
 
   const adminIds = conv.adminIds ?? [];
 
