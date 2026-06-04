@@ -77,12 +77,11 @@ export function useChatTyping(chatId: string | null | undefined) {
         drop(p.userId);
         return;
       }
+      const activity: TypingActivity = p.activity;
+      const entry: Typer = { userId: p.userId, name: p.name, activity };
       setTypers((list) => {
-        const rest = list.filter((t) => t.userId !== p.userId);
-        return [
-          ...rest,
-          { userId: p.userId, name: p.name, activity: p.activity },
-        ];
+        const rest = list.filter((t) => t.userId !== entry.userId);
+        return [...rest, entry];
       });
       const prev = timers.get(p.userId);
       if (prev) clearTimeout(prev);
