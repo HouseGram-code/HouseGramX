@@ -49,6 +49,11 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+-- Колонка официального (верифицированного) аккаунта — «галочка».
+-- Читается всеми (profiles_select_all), поэтому галочку видят все.
+alter table public.profiles
+  add column if not exists official boolean not null default false;
+
 alter table public.profiles enable row level security;
 
 drop policy if exists "profiles_select_all" on public.profiles;
