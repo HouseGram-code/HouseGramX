@@ -328,7 +328,7 @@ async function resolveDirectChats(
 
   const { data: profs } = await sb
     .from("profiles")
-    .select("id, name, username, avatar, color, last_seen")
+    .select("id, name, username, avatar, color, last_seen, official")
     .in("id", otherIds);
   const profById = new Map(
     ((profs ?? []) as ProfileRow[]).map((p) => [p.id, p])
@@ -503,7 +503,7 @@ export async function searchUsers(
   const pattern = `%${q.replace(/[%_]/g, "")}%`;
   const { data, error } = await sb
     .from("profiles")
-    .select("id, name, username, avatar, color")
+    .select("id, name, username, avatar, color, official")
     .or(`name.ilike.${pattern},username.ilike.${pattern}`)
     .neq("id", selfId)
     .limit(30);
@@ -739,7 +739,7 @@ export async function loadUserProfile(
   try {
     const { data } = await getSupabase()
       .from("profiles")
-      .select("id, name, username, avatar, color, bio, last_seen")
+      .select("id, name, username, avatar, color, bio, last_seen, official")
       .eq("id", userId)
       .maybeSingle();
     if (!data) return null;
