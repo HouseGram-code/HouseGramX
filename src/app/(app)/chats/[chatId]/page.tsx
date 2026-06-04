@@ -935,7 +935,7 @@ export default function ChatPage({
           <AnimatePresence>
             {(conv.activity || someoneTyping) && (
               <TypingBubble
-                activity={someoneTyping ? "typing" : conv.activity}
+                activity={someoneTyping ? "typing" : (conv.activity ?? "typing")}
                 name={isGroup && someoneTyping ? typingNames : undefined}
               />
             )}
