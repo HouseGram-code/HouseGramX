@@ -21,6 +21,8 @@ interface MessageBubbleProps {
   reactionsEnabled: boolean;
   /** Долгое нажатие / правый клик — открыть меню действий. */
   onOpenActions?: () => void;
+  /** Тап по стикеру — открыть набор стикеров. */
+  onOpenSticker?: (message: Message) => void;
   /** Показывать имя и аватар отправителя (для групп). */
   showSender?: boolean;
 }
@@ -34,6 +36,7 @@ export function MessageBubble({
   onQuickReact,
   reactionsEnabled,
   onOpenActions,
+  onOpenSticker,
   showSender,
 }: MessageBubbleProps) {
   const mine = message.author === "me";
@@ -44,6 +47,11 @@ export function MessageBubble({
   const openViewer = (e?: ReactMouseEvent) => {
     if (e) e.stopPropagation();
     setViewerOpen(true);
+  };
+
+  const handleStickerTap = (e: ReactMouseEvent) => {
+    e.stopPropagation();
+    if (onOpenSticker) onOpenSticker(message);
   };
 
   const handleTap = () => {
@@ -105,7 +113,7 @@ export function MessageBubble({
         />
       )}
       <div
-        onClick={handleTap}
+        onClick={isSticker && onOpenSticker ? handleStickerTap : handleTap}
         onDoubleClick={onQuickReact}
         onContextMenu={(e) => {
           if (onOpenActions) {

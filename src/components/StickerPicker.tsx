@@ -6,6 +6,7 @@ import {
   ClockCounterClockwise,
   MagnifyingGlass,
   GearSix,
+  Plus,
 } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import EmojiPicker, {
@@ -89,8 +90,19 @@ export function StickerPicker({ open, onPick, onEmoji }: StickerPickerProps) {
                 ))}
                 <button
                   type="button"
+                  onClick={() =>
+                    router.push("/settings/messages/stickers/create")
+                  }
+                  aria-label="Создать стикер"
+                  className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-accent transition hover:bg-surface-2"
+                >
+                  <Plus size={20} weight="bold" />
+                </button>
+                <button
+                  type="button"
                   onClick={() => router.push("/settings/messages/stickers")}
-                  className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-surface-2"
+                  aria-label="Настройки стикеров"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-surface-2"
                 >
                   <GearSix size={20} weight="regular" />
                 </button>

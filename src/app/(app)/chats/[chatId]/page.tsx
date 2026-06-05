@@ -1020,6 +1020,24 @@ export default function ChatPage({
         }}
       />
 
+      {/* Лист набора стикеров (по тапу на присланный стикер) */}
+      <StickerSetSheet
+        open={!!stickerSheet}
+        set={stickerSheet}
+        onClose={() => setStickerSheet(null)}
+        onSend={
+          (!isSubscribedChannel || canPostChannel) &&
+          !notJoined &&
+          !iBlockedPeer &&
+          !peerBlockedMe
+            ? (st) => {
+                sendSticker(conv.id, st.src, st.emoji, st.setId);
+                useSticker(st.id);
+              }
+            : undefined
+        }
+      />
+
       {/* Панель стикеров */}
       {!selectMode &&
         (!isSubscribedChannel || canPostChannel) &&

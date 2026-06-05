@@ -14,6 +14,7 @@ import { SubScreen } from "@/components/SubScreen";
 import { PopoverMenu } from "@/components/PopoverMenu";
 import { StickerImage } from "@/components/StickerImage";
 import { useStickers } from "@/lib/stickers-store";
+import { buildShareUrl } from "@/lib/sticker-share";
 import { useToast } from "@/components/Toast";
 
 export default function StickerSetPage({
@@ -45,7 +46,7 @@ export default function StickerSetPage({
   return (
     <SubScreen
       title={set.title}
-      subtitle={`${set.stickers.length} стикера`}
+      subtitle={`${set.stickers.length} стикеров${set.author ? ` · ${set.author}` : ""}`}
       action={
         <div className="relative">
           <button
@@ -61,13 +62,20 @@ export default function StickerSetPage({
             onClose={() => setMenuOpen(false)}
             items={[
               {
-                label: "Скопировать ссылку",
+                label: "Поделиться набором",
                 icon: LinkSimple,
                 onClick: async () => {
+                  const url = buildShareUrl(set);
                   try {
-                    await navigator.clipboard?.writeText(
-                      `${window.location.origin}/addstickers/${set.id}`
-                    );
+                    if (navigator.share) {
+                      await navigator.share({ title: set.title, url });
+                      return;
+                    }
+                  } catch {
+                    return;
+                  }
+                  try {
+                    await navigator.clipboard?.writeText(url);
                     show("Ссылка на набор скопирована");
                   } catch {
                     show("Не удалось скопировать");
@@ -75,12 +83,12 @@ export default function StickerSetPage({
                 },
               },
               {
-                label: "Удалить набор",
+                label: set.custom ? "Удалить набор" : "Убрать набор",
                 icon: Trash,
                 danger: true,
                 onClick: () => {
                   removeSet(set.id);
-                  show("Набор удалён");
+                  show(set.custom ? "Набор удалён" : "Набор убран");
                   router.back();
                 },
               },

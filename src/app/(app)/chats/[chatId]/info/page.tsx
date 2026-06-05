@@ -29,6 +29,7 @@ import { useChats } from "@/lib/chat-store";
 import { usePresence } from "@/lib/presence-store";
 import { loadUserProfile, type UserProfile } from "@/lib/chat-remote";
 import { useToast } from "@/components/Toast";
+import { useAuth } from "@/lib/auth-store";
 import { formatLastSeen } from "@/lib/utils";
 
 function subsLabel(n: number) {
@@ -50,6 +51,7 @@ export default function ChatInfoPage({
   const { getConversation, toggleBlock, setMuted } = useChats();
   const { isOnline } = usePresence();
   const { show } = useToast();
+  const { user } = useAuth();
 
   const conv = getConversation(chatId);
   const [peer, setPeer] = useState<UserProfile | null>(null);
@@ -82,6 +84,10 @@ export default function ChatInfoPage({
   const peerBlockedMe = !!conv.peerBlockedMe; // собеседник заблокировал меня
   const subs = conv.subscribers ?? 1;
   const adminsCount = 1 + (conv.adminIds?.length ?? 0);
+  // Список подписчиков виден только владельцу и администраторам канала.
+  const isStaff =
+    conv.isOwner === true ||
+    (!!user && (conv.adminIds ?? []).includes(user.id));
 
   // Данные для отображения: для DM приоритет — профиль собеседника.
   // Аватар/статус скрываем, только если ОН заблокировал меня.
@@ -267,14 +273,17 @@ export default function ChatInfoPage({
                 title="Администраторы"
                 value={String(adminsCount)}
                 onClick={() => router.push(`/chats/${chatId}/admins`)}
+                last={!isStaff}
               />
-              <Row
-                icon={UsersThree}
-                title="Подписчики"
-                value={String(subs)}
-                onClick={() => router.push(`/chats/${chatId}/subscribers`)}
-                last
-              />
+              {isStaff && (
+                <Row
+                  icon={UsersThree}
+                  title="Подписчики"
+                  value={String(subs)}
+                  onClick={() => router.push(`/chats/${chatId}/subscribers`)}
+                  last
+                />
+              )}
             </Card>
           </div>
         )}

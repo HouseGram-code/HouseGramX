@@ -10,12 +10,14 @@ import { useCloudPersistence } from "./sync";
 
 export interface Sticker {
   id: string;
-  /** Путь к изображению стикера (PNG). */
+  /** Путь к изображению стикера (PNG/data-URL/публичный URL). */
   src: string;
   /** Эмодзи-фолбэк, если картинка не загрузилась. */
   emoji: string;
   /** Подпись/ключевое слово. */
   name: string;
+  /** id набора, которому принадлежит стикер (заполняется автоматически). */
+  setId?: string;
 }
 
 export interface StickerSet {
@@ -24,6 +26,10 @@ export interface StickerSet {
   /** Путь к обложке набора. */
   cover: string;
   stickers: Sticker[];
+  /** Пользовательский набор (создан в приложении) — можно удалять/делиться. */
+  custom?: boolean;
+  /** Автор набора (имя), если создан пользователем. */
+  author?: string;
 }
 
 // Готовый набор «Подарки» (24 стикера) — Microsoft Fluent Emoji 3D (MIT).
@@ -61,15 +67,13 @@ const GIFTS_8MARCH: StickerSet = {
 
 const DEFAULT_SETS: StickerSet[] = [GIFTS_8MARCH];
 
-interface StickersState {
+interface StickersContextValue {
+  /** Видимые наборы (дефолтные + пользовательские, без скрытых). */
   sets: StickerSet[];
   /** id недавних стикеров (последние использованные первыми). */
   recent: string[];
   /** id избранных стикеров. */
   favorites: string[];
-}
-
-interface StickersContextValue extends StickersState {
   allStickers: Sticker[];
   getSticker: (id: string) => Sticker | undefined;
   useSticker: (id: string) => void;
@@ -77,6 +81,20 @@ interface StickersContextValue extends StickersState {
   isFavorite: (id: string) => boolean;
   clearRecent: () => void;
   removeSet: (id: string) => void;
+  /** Найти набор по id (включая скрытые и известные пользовательские). */
+  getSet: (id: string) => StickerSet | undefined;
+  /** Найти набор по пути стикера (для тапа по присланному стикеру). */
+  findSetBySticker: (src?: string, setId?: string) => StickerSet | undefined;
+  /** Установлен ли набор (виден в моих наборах). */
+  isSetInstalled: (id: string) => boolean;
+  /** Создать новый пользовательский набор. Возвращает его. */
+  createSet: (args: {
+    title: string;
+    author?: string;
+    stickers: Array<{ src: string; emoji: string; name?: string }>;
+  }) => StickerSet;
+  /** Добавить (установить) набор — например, полученный по ссылке. */
+  addSet: (set: StickerSet) => void;
   /** Недавние эмодзи. */
   recentEmojis: string[];
   useEmoji: (emoji: string) => void;
@@ -86,8 +104,17 @@ const StickersContext = createContext<StickersContextValue | null>(null);
 
 const STORAGE_KEY = "messenger.stickers.v1";
 
+function uid(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 7)}`;
+}
+
 export function StickersProvider({ children }: { children: ReactNode }) {
-  const [sets, setSets] = useState<StickerSet[]>(DEFAULT_SETS);
+  // Пользовательские наборы (созданные/импортированные).
+  const [customSets, setCustomSets] = useState<StickerSet[]>([]);
+  // Скрытые наборы (удалённые пользователем — в т.ч. дефолтные).
+  const [hiddenSetIds, setHiddenSetIds] = useState<string[]>([]);
   const [recent, setRecent] = useState<string[]>(["g15", "g7"]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [recentEmojis, setRecentEmojis] = useState<string[]>([]);
@@ -97,24 +124,50 @@ export function StickersProvider({ children }: { children: ReactNode }) {
     recent: string[];
     favorites: string[];
     recentEmojis: string[];
+    customSets: StickerSet[];
+    hiddenSetIds: string[];
   };
 
   useCloudPersistence<StickersSnapshot>({
     key: STORAGE_KEY,
-    snapshot: { recent, favorites, recentEmojis },
+    snapshot: { recent, favorites, recentEmojis, customSets, hiddenSetIds },
     hydrated,
     setHydrated,
     applyData: (p) => {
       if (p.recent) setRecent(p.recent);
       if (p.favorites) setFavorites(p.favorites);
       if (p.recentEmojis) setRecentEmojis(p.recentEmojis);
-      // Набор всегда дефолтный — храним только пользовательские состояния.
+      if (p.customSets) setCustomSets(p.customSets);
+      if (p.hiddenSetIds) setHiddenSetIds(p.hiddenSetIds);
     },
   });
 
-  const allStickers = sets.flatMap((s) => s.stickers);
+  // Все известные наборы (для поиска), затем — только видимые.
+  const knownSets: StickerSet[] = [...DEFAULT_SETS, ...customSets];
+  const sets: StickerSet[] = knownSets.filter(
+    (s) => !hiddenSetIds.includes(s.id)
+  );
+
+  // Стикеры получают setId автоматически из своего набора.
+  const allStickers: Sticker[] = sets.flatMap((s) =>
+    s.stickers.map((st) => ({ ...st, setId: s.id }))
+  );
 
   const getSticker = (id: string) => allStickers.find((s) => s.id === id);
+
+  const getSet = (id: string) => knownSets.find((s) => s.id === id);
+
+  const isSetInstalled = (id: string) =>
+    sets.some((s) => s.id === id);
+
+  const findSetBySticker = (src?: string, setId?: string) => {
+    if (setId) {
+      const byId = getSet(setId);
+      if (byId) return byId;
+    }
+    if (!src) return undefined;
+    return knownSets.find((s) => s.stickers.some((st) => st.src === src));
+  };
 
   const useSticker = (id: string) => {
     setRecent((r) => [id, ...r.filter((x) => x !== id)].slice(0, 24));
@@ -134,25 +187,76 @@ export function StickersProvider({ children }: { children: ReactNode }) {
 
   const clearRecent = () => setRecent([]);
 
-  const removeSet = (id: string) => setSets((s) => s.filter((x) => x.id !== id));
+  const removeSet = (id: string) => {
+    // Прячем из видимых; пользовательский — удаляем полностью.
+    setHiddenSetIds((h) => (h.includes(id) ? h : [...h, id]));
+    setCustomSets((c) => c.filter((s) => s.id !== id));
+  };
+
+  const createSet: StickersContextValue["createSet"] = ({
+    title,
+    author,
+    stickers,
+  }) => {
+    const setId = uid("set");
+    const built: Sticker[] = stickers.map((s, i) => ({
+      id: uid(`st${i}`),
+      src: s.src,
+      emoji: s.emoji || "⭐️",
+      name: s.name || title,
+      setId,
+    }));
+    const set: StickerSet = {
+      id: setId,
+      title: title.trim() || "Мой набор",
+      cover: built[0]?.src ?? "",
+      stickers: built,
+      custom: true,
+      author,
+    };
+    setCustomSets((c) => [...c, set]);
+    setHiddenSetIds((h) => h.filter((x) => x !== setId));
+    return set;
+  };
+
+  const addSet: StickersContextValue["addSet"] = (set) => {
+    // Снимаем «скрытие», если набор был удалён ранее.
+    setHiddenSetIds((h) => h.filter((x) => x !== set.id));
+    setCustomSets((c) => {
+      if (c.some((s) => s.id === set.id)) return c;
+      // Дефолтные наборы повторно не дублируем.
+      if (DEFAULT_SETS.some((s) => s.id === set.id)) return c;
+      const normalized: StickerSet = {
+        ...set,
+        custom: true,
+        stickers: set.stickers.map((st) => ({ ...st, setId: set.id })),
+      };
+      return [...c, normalized];
+    });
+  };
+
+  const ctxValue: StickersContextValue = {
+    sets,
+    recent,
+    favorites,
+    recentEmojis,
+    allStickers,
+    getSticker,
+    useSticker,
+    useEmoji,
+    toggleFavorite,
+    isFavorite,
+    clearRecent,
+    removeSet,
+    getSet,
+    findSetBySticker,
+    isSetInstalled,
+    createSet,
+    addSet,
+  };
 
   return (
-    <StickersContext.Provider
-      value={{
-        sets,
-        recent,
-        favorites,
-        allStickers,
-        getSticker,
-        useSticker,
-        toggleFavorite,
-        isFavorite,
-        clearRecent,
-        removeSet,
-        recentEmojis,
-        useEmoji,
-      }}
-    >
+    <StickersContext.Provider value={ctxValue}>
       {children}
     </StickersContext.Provider>
   );

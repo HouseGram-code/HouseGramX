@@ -83,6 +83,8 @@ export interface Message {
   text?: string;
   stickerSrc?: string;
   stickerEmoji?: string;
+  /** Идентификатор набора стикеров (для открытия набора по тапу). */
+  stickerSetId?: string;
   /** Вложение (фото/видео/аудио/файл). */
   mediaKind?: MediaKind;
   mediaUrl?: string;
@@ -262,7 +264,12 @@ interface ChatContextValue {
     text: string,
     opts?: { replyTo?: Message }
   ) => void;
-  sendSticker: (chatId: string, src: string, emoji: string) => void;
+  sendSticker: (
+    chatId: string,
+    src: string,
+    emoji: string,
+    setId?: string
+  ) => void;
   /** Отправить вложение (фото/видео/аудио/файл) с загрузкой в Storage. */
   sendMedia: (chatId: string, file: File) => void;
   setReaction: (chatId: string, messageId: string, emoji: string) => void;
@@ -288,7 +295,7 @@ interface ChatContextValue {
   joinByLink: (code: string, kind: "channel" | "group") => string;
   /** Вступить в открытый канал/группу (кнопка «Присоединиться»). */
   joinChat: (chatId: string, displayName: string) => void;
-  /** Открыть/создать личный чат с найденным пользователем. Возвращает id. */
+  /** Открыть/создать личный чат с ��айденным пользователем. Возвращает id. */
   startDirectChat: (user: FoundUser) => Promise<string>;
   updateChannel: (chatId: string, patch: Partial<Conversation>) => void;
   addMembers: (chatId: string, ids: string[]) => void;
@@ -454,6 +461,7 @@ function botReply(input: string): Omit<Message, "id" | "time" | "ts">[] {
         kind: "sticker",
         stickerSrc: "/stickers/gifts/g3.png",
         stickerEmoji: "🧸",
+        stickerSetId: "gifts-8march",
         reaction: null,
       },
     ];
@@ -921,13 +929,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (conv?.kind === "bot") scheduleBotReply(chatId, trimmed);
   };
 
-  const sendSticker: ChatContextValue["sendSticker"] = (chatId, src, emoji) => {
+  const sendSticker: ChatContextValue["sendSticker"] = (
+    chatId,
+    src,
+    emoji,
+    setId
+  ) => {
     appendMessages(chatId, [
       {
         author: "me",
         kind: "sticker",
         stickerSrc: src,
         stickerEmoji: emoji,
+        stickerSetId: setId,
         read: false,
         reaction: null,
       },
@@ -1170,6 +1184,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         text: orig.text,
         stickerSrc: orig.stickerSrc,
         stickerEmoji: orig.stickerEmoji,
+        stickerSetId: orig.stickerSetId,
         read: false,
         reaction: null,
         forwardedFrom: src?.title,
@@ -1280,25 +1295,29 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       reaction: null,
     };
     let newSubs = 1;
+    let pushSys = false;
     update(chatId, (c) => {
       const isGroup = c.kind === "group";
-      sysMsg.text = isGroup
-        ? `${displayName} присоединился к группе`
-        : `${displayName} подписался на канал`;
       newSubs = (c.subscribers ?? 1) + 1;
-      return {
-        ...c,
-        joined: true,
-        subscribers: newSubs,
-        messages: [...c.messages, sysMsg],
-      };
+      if (isGroup) {
+        pushSys = true;
+        sysMsg.text = `${displayName} присоединился к группе`;
+        return {
+          ...c,
+          joined: true,
+          subscribers: newSubs,
+          messages: [...c.messages, sysMsg],
+        };
+      }
+      // Канал: подписка анонимна — имя подписчика не раскрываем.
+      return { ...c, joined: true, subscribers: newSubs };
     });
     // Реальное членство + общие данные в облаке.
     const userId = me();
     if (userId) {
       joinChatRemote(chatId, userId);
       updateChatRemote(chatId, { subscribers: newSubs }, userId);
-      insertMessageRemote(chatId, sysMsg, null);
+      if (pushSys) insertMessageRemote(chatId, sysMsg, null);
     }
   };
 

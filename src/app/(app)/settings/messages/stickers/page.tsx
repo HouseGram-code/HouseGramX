@@ -2,7 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { ClockCounterClockwise, BookmarkSimple, List } from "@phosphor-icons/react";
+import {
+  ClockCounterClockwise,
+  BookmarkSimple,
+  List,
+  PlusCircle,
+} from "@phosphor-icons/react";
 import { SubScreen } from "@/components/SubScreen";
 import { Group, NavRow, SectionTitle } from "@/components/settings-ui";
 import { useStickers } from "@/lib/stickers-store";
@@ -45,6 +50,16 @@ export default function StickerSettingsPage() {
 
       <SectionTitle>Мои наборы</SectionTitle>
       <Group>
+        <NavRow
+          icon={PlusCircle}
+          label="Создать набор стикеров"
+          onClick={() => router.push("/settings/messages/stickers/create")}
+          last={sets.length === 0}
+        />
+      </Group>
+
+      {sets.length > 0 && (
+      <Group>
         {sets.map((set, i) => (
           <button
             key={set.id}
@@ -78,6 +93,7 @@ export default function StickerSettingsPage() {
           </button>
         ))}
       </Group>
+      )}
     </SubScreen>
   );
 }

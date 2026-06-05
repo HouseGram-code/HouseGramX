@@ -9,6 +9,7 @@ import { Avatar } from "@/components/Avatar";
 import { useProfile } from "@/lib/profile-store";
 import { useContacts } from "@/lib/contacts-store";
 import { useChats } from "@/lib/chat-store";
+import { useAuth } from "@/lib/auth-store";
 
 function subsLabel(n: number) {
   const m10 = n % 10;
@@ -29,10 +30,25 @@ export default function SubscribersPage({
   const { getConversation, removeMember } = useChats();
   const { profile, initials } = useProfile();
   const { getContact } = useContacts();
+  const { user } = useAuth();
   const conv = getConversation(chatId);
   const [editing, setEditing] = useState(false);
 
   if (!conv) return <SubScreen title="Не найдено">{null}</SubScreen>;
+
+  // Подписчики канала анонимны: список доступен только владельцу и админам.
+  const isStaff =
+    conv.isOwner === true ||
+    (!!user && (conv.adminIds ?? []).includes(user.id));
+  if (!isStaff) {
+    return (
+      <SubScreen title="Подписчики">
+        <p className="px-6 py-12 text-center text-[14px] leading-relaxed text-muted">
+          Список подписчиков канала виден только владельцу и администраторам.
+        </p>
+      </SubScreen>
+    );
+  }
 
   const memberIds = conv.memberIds ?? [];
   const subs = conv.subscribers ?? 1;

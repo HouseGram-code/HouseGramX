@@ -24,7 +24,7 @@ export function BottomNav() {
   if (isDetail) return null;
 
   return (
-    <nav className="sticky bottom-0 z-30 border-t border-separator bg-surface/90 backdrop-blur-2xl md:hidden">
+    <nav className="relative z-30 shrink-0 border-t border-separator bg-surface/90 backdrop-blur-2xl md:hidden">
       <ul className="flex items-stretch justify-around px-1 pt-2 pb-[max(env(safe-area-inset-bottom),10px)]">
         {navItems.map((item) => {
           const active = isActive(pathname, item.href);
