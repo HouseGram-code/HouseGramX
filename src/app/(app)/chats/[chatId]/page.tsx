@@ -518,7 +518,7 @@ export default function ChatPage({
               <p className="truncate text-[12px]">
                 {isChannel ? (
                   <span className="text-muted">
-                    {subsLabel(Math.max(0, (conv.subscribers ?? 1) - 1))}
+                    {subsLabel(conv.subscribers ?? 1)}
                   </span>
                 ) : isGroup ? (
                   someoneTyping ? (
@@ -533,7 +533,7 @@ export default function ChatPage({
                     <span className="text-green-500">бот · в сети</span>
                   )
                 ) : peerBlockedMe ? (
-                  <span className="text-muted">бы��(а) давно</span>
+                  <span className="text-muted">был(а) давно</span>
                 ) : conv.activity || someoneTyping ? (
                   <ActivityText activity={conv.activity ?? "typing"} />
                 ) : peerOnline ? (
@@ -798,7 +798,7 @@ export default function ChatPage({
               <p className="text-[13px] text-muted">
                 {isGroup
                   ? `${conv.subscribers ?? 1} участник(ов)`
-                  : `${Math.max(0, (conv.subscribers ?? 1) - 1)} подписчик(ов)`}
+                  : `${conv.subscribers ?? 1} подписчик(ов)`}
               </p>
               {conv.description && (
                 <p className="mt-1 text-[14px] leading-relaxed text-foreground/80">
@@ -835,7 +835,7 @@ export default function ChatPage({
               Сегодня
             </div>
             <div className="rounded-full bg-accent/15 px-3 py-1 text-[12px] text-accent">
-              Канал созд��н
+              Канал создан
             </div>
           </div>
         )}
@@ -927,6 +927,11 @@ export default function ChatPage({
               message={m}
               fontSize={s.fontSize}
               onOpenActions={() => setActiveMsg(m.id)}
+              onOpenSticker={(msg) =>
+                setStickerSheet(
+                  findSetBySticker(msg.stickerSrc, msg.stickerSetId) ?? null,
+                )
+              }
             />
           ) : (
             <MessageBubble
@@ -1094,7 +1099,7 @@ export default function ChatPage({
             }}
             className="w-full text-center text-[16px] font-semibold text-accent transition active:opacity-60"
           >
-            {conv.muted ? "Включить уведомления" : "Отключить уведомлен��я"}
+            {conv.muted ? "Включить уведомления" : "Отключить уведомления"}
           </button>
         </div>
       )}
@@ -1113,7 +1118,7 @@ export default function ChatPage({
             }}
             className="mt-1 w-full text-center text-[16px] font-semibold uppercase tracking-wide text-accent transition active:opacity-60"
           >
-            Разб��окировать
+            Разблокировать
           </button>
         </div>
       )}
@@ -1315,13 +1320,13 @@ export default function ChatPage({
                     },
                   },
                   {
-                    label: "��а 4 часа",
+                    label: "На 4 часа",
                     onClick: () => {
                       updateChannel(conv.id, {
                         muted: true,
                         mutedUntil: Date.now() + 4 * 3600000,
                       });
-                      show("Уве��омления отключены на 4 часа");
+                      show("Уведомления отключены на 4 часа");
                     },
                   },
                   {

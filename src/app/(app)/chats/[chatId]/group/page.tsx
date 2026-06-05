@@ -166,7 +166,7 @@ export default function GroupInfoPage({
                 onClick: () =>
                   setConfirm({
                     title: "Очистить историю чата?",
-                    message: "Восстановить сообщения не получитс��",
+                    message: "Восстановить сообщения не получится",
                     confirmLabel: "Очистить у всех",
                     danger: true,
                     onConfirm: () => {
@@ -323,7 +323,7 @@ export default function GroupInfoPage({
           </Card>
         </div>
 
-        {/* Вло��ения */}
+        {/* Вложения */}
         <div className="mt-4 px-3">
           <Card>
             <Row

@@ -13,6 +13,7 @@ interface ChannelPostProps {
   message: Message;
   fontSize: number;
   onOpenActions: () => void;
+  onOpenSticker?: (message: Message) => void;
 }
 
 const HOLD_MS = 450;
@@ -23,6 +24,7 @@ export function ChannelPost({
   message,
   fontSize,
   onOpenActions,
+  onOpenSticker,
 }: ChannelPostProps) {
   const holdTimer = useRef<number | null>(null);
 
@@ -54,6 +56,9 @@ export function ChannelPost({
         onPointerDown={startHold}
         onPointerUp={cancelHold}
         onPointerLeave={cancelHold}
+        onClick={() => {
+          if (isSticker) onOpenSticker?.(message);
+        }}
         className={cn(
           "max-w-[85%] cursor-pointer select-none rounded-2xl rounded-bl-md bg-surface px-3 py-2 shadow-sm ring-1 ring-separator",
           isSticker && "bg-transparent ring-0 shadow-none px-0"

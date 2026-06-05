@@ -295,7 +295,7 @@ interface ChatContextValue {
   joinByLink: (code: string, kind: "channel" | "group") => string;
   /** Вступить в открытый канал/группу (кнопка «Присоединиться»). */
   joinChat: (chatId: string, displayName: string) => void;
-  /** Открыть/создать личный чат с ��айденным пользователем. Возвращает id. */
+  /** Открыть/создать личный чат с найденным пользователем. Возвращает id. */
   startDirectChat: (user: FoundUser) => Promise<string>;
   updateChannel: (chatId: string, patch: Partial<Conversation>) => void;
   addMembers: (chatId: string, ids: string[]) => void;
@@ -1375,7 +1375,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       return code;
     }
 
-    // Пытаемся з��грузить реальный чат из облака по его id.
+    // Пытаемся загрузить реальный чат из облака по его id.
     if (isSupabaseConfigured) {
       const userId = me();
       void loadChatById(code, userId).then((remote) => {
@@ -1615,7 +1615,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       };
     });
     setActiveCall((c) => (c?.chatId === chatId ? null : c));
-    // Владелец — удаляет чат целиком; иначе просто выходим (удаляем своё членст��о).
+    // Владелец — удаляет чат целиком; иначе просто выходим (удаляем своё членство).
     const userId = me();
     if (userId) {
       if (conv?.isOwner) {

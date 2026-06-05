@@ -247,7 +247,7 @@ export async function loadMyChats(uid: string): Promise<Conversation[]> {
   if (!isSupabaseConfigured) return [];
   const sb = getSupabase();
 
-  // Мои чл��нства.
+  // Мои членства.
   const { data: memberRows } = await sb
     .from("chat_members")
     .select("chat_id, user_id, role, muted, muted_until, last_read, blocked")
@@ -353,7 +353,7 @@ async function resolveDirectChats(
   }
 }
 
-/** Загружает один публичный чат по id (для открытия по ссы��к��). */
+/** Загружает один публичный чат по id (для открытия по ссылке). */
 export async function loadChatById(
   id: string,
   uid: string | null
