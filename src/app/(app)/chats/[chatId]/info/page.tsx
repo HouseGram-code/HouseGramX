@@ -262,27 +262,30 @@ export default function ChatInfoPage({
                 title="Вложения"
                 subtitle="Фото, видео, файлы и ссылки"
                 onClick={() => router.push(`/chats/${chatId}/attachments`)}
-              />
-              <Row
-                icon={LinkSimple}
-                title="Пригласить по ссылке"
-                onClick={() => router.push(`/chats/${chatId}/invite`)}
-              />
-              <Row
-                icon={UserCircleGear}
-                title="Администраторы"
-                value={String(adminsCount)}
-                onClick={() => router.push(`/chats/${chatId}/admins`)}
                 last={!isStaff}
               />
+              {/* Управление каналом видно только владельцу и администраторам (как в Telegram) */}
               {isStaff && (
-                <Row
-                  icon={UsersThree}
-                  title="Подписчики"
-                  value={String(subs)}
-                  onClick={() => router.push(`/chats/${chatId}/subscribers`)}
-                  last
-                />
+                <>
+                  <Row
+                    icon={LinkSimple}
+                    title="Пригласить по ссылке"
+                    onClick={() => router.push(`/chats/${chatId}/invite`)}
+                  />
+                  <Row
+                    icon={UserCircleGear}
+                    title="Администраторы"
+                    value={String(adminsCount)}
+                    onClick={() => router.push(`/chats/${chatId}/admins`)}
+                  />
+                  <Row
+                    icon={UsersThree}
+                    title="Подписчики"
+                    value={String(subs)}
+                    onClick={() => router.push(`/chats/${chatId}/subscribers`)}
+                    last
+                  />
+                </>
               )}
             </Card>
           </div>

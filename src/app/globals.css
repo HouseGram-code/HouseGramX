@@ -101,3 +101,30 @@ body {
     background-color: var(--surface-2);
   }
 }
+
+/* Баннер «Создай свой первый стикер»: белый блик пробегает 2 раза */
+@keyframes sticker-shine {
+  from {
+    transform: translateX(-220%) skewX(-12deg);
+  }
+  to {
+    transform: translateX(420%) skewX(-12deg);
+  }
+}
+.animate-sticker-shine {
+  animation: sticker-shine 1.5s ease-in-out 2 both;
+}
+
+/* «Анимированный» эмодзи рядом с текстом баннера */
+@keyframes sticker-emoji-bounce {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-7deg) scale(1);
+  }
+  50% {
+    transform: translateY(-4px) rotate(7deg) scale(1.12);
+  }
+}
+.animate-sticker-emoji {
+  animation: sticker-emoji-bounce 1.3s ease-in-out infinite;
+}

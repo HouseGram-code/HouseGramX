@@ -72,7 +72,8 @@ export default function StickerSetPage({
                       return;
                     }
                   } catch {
-                    return;
+                    // отмена или ошибка системного «Поделиться» —
+                    // копируем ссылку как запасной вариант
                   }
                   try {
                     await navigator.clipboard?.writeText(url);
@@ -136,7 +137,23 @@ export default function StickerSetPage({
       <div className="fixed inset-x-0 bottom-0 z-10 mx-auto max-w-2xl border-t border-separator bg-surface/95 px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 backdrop-blur-xl">
         <button
           type="button"
-          onClick={() => show("Выберите чат для пересылки набора")}
+          onClick={async () => {
+            const url = buildShareUrl(set);
+            try {
+              if (navigator.share) {
+                await navigator.share({ title: set.title, url });
+                return;
+              }
+            } catch {
+              // отмена/ошибка — копируем ссылку
+            }
+            try {
+              await navigator.clipboard?.writeText(url);
+              show("Ссылка на набор скопирована");
+            } catch {
+              show("Не удалось скопировать");
+            }
+          }}
           className="flex w-full items-center justify-center gap-2 rounded-2xl bg-surface-2 py-3.5 text-[16px] font-semibold text-foreground transition active:scale-[0.99]"
         >
           <PaperPlaneRight size={20} weight="bold" />

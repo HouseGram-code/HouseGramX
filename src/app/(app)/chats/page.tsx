@@ -24,6 +24,7 @@ import { countUnread, searchUsers, type FoundUser } from "@/lib/chat-remote";
 import { usePresence } from "@/lib/presence-store";
 import { ConnectionTitle } from "@/components/ConnectionTitle";
 import { cn } from "@/lib/utils";
+import { StickerPromoBanner } from "@/components/StickerPromoBanner";
 
 type ChatFilter = "all" | "new";
 
@@ -223,6 +224,7 @@ export default function ChatsPage() {
 
       {/* Список чатов */}
       <div className="no-scrollbar flex-1 overflow-y-auto border-t border-separator">
+        {!query.trim() && <StickerPromoBanner />}
         {visible.map((conv, i) => {
             const preview = lastPreview(conv);
             const unread = countUnread(conv);

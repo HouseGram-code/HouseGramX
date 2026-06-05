@@ -76,14 +76,35 @@ export function StickerPicker({ open, onPick, onEmoji }: StickerPickerProps) {
             <>
               {/* Категории-наборы сверху */}
               <div className="no-scrollbar flex shrink-0 items-center gap-1 overflow-x-auto border-b border-separator px-2 py-1.5">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-accent">
+                <button
+                  type="button"
+                  aria-label="К началу"
+                  onClick={() => {
+                    setTab("stickers");
+                    requestAnimationFrame(() => {
+                      document
+                        .getElementById("pk-scroll")
+                        ?.scrollTo({ top: 0, behavior: "smooth" });
+                    });
+                  }}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-accent transition active:scale-90"
+                >
                   <ClockCounterClockwise size={20} weight="regular" />
-                </span>
+                </button>
                 {sets.map((set) => (
                   <button
                     key={set.id}
                     type="button"
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition hover:bg-surface-2"
+                    aria-label={set.title}
+                    onClick={() => {
+                      setTab("stickers");
+                      requestAnimationFrame(() => {
+                        document
+                          .getElementById(`pk-set-${set.id}`)
+                          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      });
+                    }}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition hover:bg-surface-2 active:scale-90"
                   >
                     <StickerImage sticker={set.stickers[0]} size={26} />
                   </button>
@@ -126,7 +147,7 @@ export function StickerPicker({ open, onPick, onEmoji }: StickerPickerProps) {
               </div>
 
               {/* Стикеры */}
-              <div className="no-scrollbar flex-1 overflow-y-auto px-3 py-2">
+              <div id="pk-scroll" className="no-scrollbar flex-1 overflow-y-auto px-3 py-2">
                 {recentStickers.length > 0 && (
                   <>
                     <SectionLabel>Недавние</SectionLabel>
@@ -149,7 +170,7 @@ export function StickerPicker({ open, onPick, onEmoji }: StickerPickerProps) {
                     : set.stickers;
                   if (list.length === 0) return null;
                   return (
-                    <div key={set.id} className="mb-3">
+                    <div key={set.id} id={`pk-set-${set.id}`} className="mb-3">
                       <SectionLabel>{set.title}</SectionLabel>
                       <div className="grid grid-cols-5 gap-1">
                         {list.map((s) => (
