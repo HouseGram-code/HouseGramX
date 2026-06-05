@@ -7,7 +7,6 @@ import { CaretLeft, Camera, X, At, Trash } from "@phosphor-icons/react";
 import { Avatar } from "@/components/Avatar";
 import { Group, GroupHint, SectionTitle } from "@/components/settings-ui";
 import { useProfile } from "@/lib/profile-store";
-import { uploadImage } from "@/lib/storage";
 import { useToast } from "@/components/Toast";
 
 const MAX_BIO = 120;
@@ -46,23 +45,53 @@ export default function ProfileEditPage() {
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => setAvatar(String(reader.result));
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      // Сжимаем аватар до компактного размера, чтобы он надёжно сохранялся
+      // (и в облаке, и в кэше) и не «слетал» после перезагрузки/выхода.
+      const img = new window.Image();
+      img.onload = () => {
+        const MAX = 512;
+        let w = img.width;
+        let h = img.height;
+        if (w > MAX || h > MAX) {
+          if (w >= h) {
+            h = Math.round((h * MAX) / w);
+            w = MAX;
+          } else {
+            w = Math.round((w * MAX) / h);
+            h = MAX;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          setAvatar(dataUrl);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, w, h);
+        setAvatar(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.onerror = () => setAvatar(dataUrl);
+      img.src = dataUrl;
+    };
     reader.readAsDataURL(file);
   };
 
   const handleSave = async () => {
     if (!canSave || saving) return;
     setSaving(true);
-    let avatarUrl = avatar;
-    // Если выбрана новая картинка (data-URL) — загружаем в Storage.
-    if (avatar && avatar.startsWith("data:")) {
-      avatarUrl = await uploadImage(avatar, "profile");
-    }
+    // Аватар уже сжат до ≤512px (JPEG) и хранится прямо как data-URL в таблице
+    // profiles — так он гарантированно виден всем. Раньше файл грузился в
+    // приватный Storage-бакет, и публичная ссылка отдавала 403 → у других
+    // показывалась заглушка-«человек».
     save({
       name: name.trim(),
       username: username.trim(),
       bio: bio.trim(),
-      avatar: avatarUrl,
+      avatar,
     });
     show("Профиль сохранён");
     router.back();

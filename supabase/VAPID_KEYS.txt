@@ -1,0 +1,52 @@
+# VAPID Keys для настройки Supabase
+
+Эти ключи нужно добавить в Supabase Project Settings → Edge Functions → Secrets:
+
+## 1. VAPID_PUBLIC_KEY
+BCnMhu7KzWhRYYuVptWWcWPX-RU2o8rivZb-xmP8NKSLg2vnIfSYcS5CeCE07ZFJfed8V_lPFc_sTHvFvqy6kGA
+
+## 2. VAPID_PRIVATE_KEY
+_Q4LViZxAxnCBsilf7ScRd5jgFNgulpniEMQBlwXjJQ
+
+## 3. VAPID_SUBJECT
+mailto:admin@yourdomain.com
+(замените на ваш email или URL вашего сайта, например: https://yourdomain.com)
+
+---
+
+## Инструкция по настройке:
+
+### Шаг 1: Добавить секреты в Supabase
+1. Откройте Supabase Dashboard → Project Settings → Edge Functions
+2. В разделе "Secrets" добавьте три переменные:
+   - VAPID_PUBLIC_KEY = BCnMhu7KzWhRYYuVptWWcWPX-RU2o8rivZb-xmP8NKSLg2vnIfSYcS5CeCE07ZFJfed8V_lPFc_sTHvFvqy6kGA
+   - VAPID_PRIVATE_KEY = _Q4LViZxAxnCBsilf7ScRd5jgFNgulpniEMQBlwXjJQ
+   - VAPID_SUBJECT = mailto:your-email@domain.com
+
+### Шаг 2: Развернуть Edge Function
+```bash
+cd supabase
+supabase functions deploy push
+```
+
+### Шаг 3: Создать Database Webhook
+1. Откройте Supabase Dashboard → Database → Webhooks
+2. Создайте новый webhook:
+   - Name: "push_notification_on_new_message"
+   - Table: "messages"
+   - Events: INSERT
+   - Type: HTTP Request
+   - Method: POST
+   - URL: https://[your-project-ref].supabase.co/functions/v1/push
+   - HTTP Headers:
+     * Authorization: Bearer [your-anon-key]
+     * Content-Type: application/json
+
+### Шаг 4: Обновить VAPID_PUBLIC_KEY в клиенте
+Откройте src/lib/push.ts и замените VAPID_PUBLIC_KEY на:
+BCnMhu7KzWhRYYuVptWWcWPX-RU2o8rivZb-xmP8NKSLg2vnIfSYcS5CeCE07ZFJfed8V_lPFc_sTHvFvqy6kGA
+
+---
+
+⚠️ ВАЖНО: Не коммитьте этот файл в публичный репозиторий!
+Приватные ключи должны храниться только в Supabase Secrets.

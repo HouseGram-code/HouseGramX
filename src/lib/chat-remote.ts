@@ -79,6 +79,7 @@ export interface ProfileRow {
   bio?: string | null;
   last_seen?: string | null;
   official?: boolean | null;
+  badge?: string | null;
 }
 
 /** Найденный пользователь (для поиска и старта чата). */
@@ -90,6 +91,7 @@ export interface FoundUser {
   color: string;
   initials: string;
   official?: boolean;
+  badge?: string;
 }
 
 function initialsOf(name: string): string {
@@ -328,7 +330,7 @@ async function resolveDirectChats(
 
   const { data: profs } = await sb
     .from("profiles")
-    .select("id, name, username, avatar, color, last_seen, official")
+    .select("id, name, username, avatar, color, last_seen, official, badge")
     .in("id", otherIds);
   const profById = new Map(
     ((profs ?? []) as ProfileRow[]).map((p) => [p.id, p])
@@ -345,12 +347,13 @@ async function resolveDirectChats(
       c.color = p.color || c.color;
       c.initials = initialsOf(p.name || "?");
       c.peerOfficial = !!p.official;
+      c.peerBadge = p.badge || undefined;
       if (p.last_seen) c.lastSeen = new Date(p.last_seen).getTime();
     }
   }
 }
 
-/** Загружает один публичный чат по id (для открытия по ссылк��). */
+/** Загружает один публичный чат по id (для открытия по ссы��к��). */
 export async function loadChatById(
   id: string,
   uid: string | null
@@ -503,7 +506,7 @@ export async function searchUsers(
   const pattern = `%${q.replace(/[%_]/g, "")}%`;
   const { data, error } = await sb
     .from("profiles")
-    .select("id, name, username, avatar, color, official")
+    .select("id, name, username, avatar, color, official, badge")
     .or(`name.ilike.${pattern},username.ilike.${pattern}`)
     .neq("id", selfId)
     .limit(30);
@@ -519,6 +522,7 @@ export async function searchUsers(
     color: p.color || "#6c5ce7",
     initials: initialsOf(p.name || "?"),
     official: !!p.official,
+    badge: p.badge || "",
   }));
 }
 
@@ -613,6 +617,7 @@ export async function openDirectChat(
     avatar: other.avatar || undefined,
     peerId: other.id,
     peerOfficial: other.official,
+    peerBadge: other.badge,
     joined: true,
     messages,
   };
@@ -729,6 +734,7 @@ export interface UserProfile {
   lastSeen?: number;
   initials: string;
   official?: boolean;
+  badge?: string;
 }
 
 /** Загружает полный публичный профиль пользователя по id. */
@@ -739,7 +745,7 @@ export async function loadUserProfile(
   try {
     const { data } = await getSupabase()
       .from("profiles")
-      .select("id, name, username, avatar, color, bio, last_seen, official")
+      .select("id, name, username, avatar, color, bio, last_seen, official, badge")
       .eq("id", userId)
       .maybeSingle();
     if (!data) return null;
@@ -755,9 +761,44 @@ export async function loadUserProfile(
       lastSeen: p.last_seen ? new Date(p.last_seen).getTime() : undefined,
       initials: initialsOf(name),
       official: !!p.official,
+      badge: p.badge || "",
     };
   } catch (e) {
     console.warn("[chat-remote] loadUserProfile:", e);
+    return null;
+  }
+}
+
+/** Загружает публичный профиль пользователя по username (без учёта регистра). */
+export async function loadUserProfileByUsername(
+  username: string
+): Promise<UserProfile | null> {
+  if (!isSupabaseConfigured) return null;
+  const u = username.trim();
+  if (!u) return null;
+  try {
+    const { data } = await getSupabase()
+      .from("profiles")
+      .select("id, name, username, avatar, color, bio, last_seen, official, badge")
+      .ilike("username", u)
+      .maybeSingle();
+    if (!data) return null;
+    const p = data as ProfileRow;
+    const name = p.name || "Пользователь";
+    return {
+      id: p.id,
+      name,
+      username: p.username || "",
+      avatar: p.avatar || "",
+      color: p.color || "#6c5ce7",
+      bio: p.bio || "",
+      lastSeen: p.last_seen ? new Date(p.last_seen).getTime() : undefined,
+      initials: initialsOf(name),
+      official: !!p.official,
+      badge: p.badge || "",
+    };
+  } catch (e) {
+    console.warn("[chat-remote] loadUserProfileByUsername:", e);
     return null;
   }
 }

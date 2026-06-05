@@ -27,6 +27,7 @@ import {
 } from "@phosphor-icons/react";
 import { Avatar } from "@/components/Avatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { BugHunterBadge } from "@/components/BugHunterBadge";
 import { MessageBubble } from "@/components/MessageBubble";
 import { ChannelPost } from "@/components/ChannelPost";
 import { StickerPicker } from "@/components/StickerPicker";
@@ -41,6 +42,7 @@ import { AttachSheet } from "@/components/AttachSheet";
 import { PopoverMenu } from "@/components/PopoverMenu";
 import { ActivityText, TypingBubble } from "@/components/TypingIndicator";
 import { useChats, canAdminDo, type Message } from "@/lib/chat-store";
+import { loadUserProfile, type UserProfile } from "@/lib/chat-remote";
 import { useGroupCall, useCallWatch } from "@/lib/group-call";
 import { useChatTyping } from "@/lib/typing";
 import { useSettings } from "@/lib/settings-store";
@@ -157,6 +159,24 @@ export default function ChatPage({
     return () => setActiveChat(null);
   }, [chatId]);
 
+  // Свежий профиль собеседника (аватар/имя/галочка) из облака — чтобы
+  // шапка всегда показывала актуальные данные, даже если в локальном
+  // кэше пусто/устарело.
+  const [peerProfile, setPeerProfile] = useState<UserProfile | null>(null);
+  useEffect(() => {
+    let active = true;
+    if (conv?.kind === "private" && conv.peerId) {
+      loadUserProfile(conv.peerId).then((p) => {
+        if (active) setPeerProfile(p);
+      });
+    } else {
+      setPeerProfile(null);
+    }
+    return () => {
+      active = false;
+    };
+  }, [conv?.kind, conv?.peerId]);
+
   if (!conv) {
     return (
       <div className="flex h-full flex-1 flex-col items-center justify-center gap-3 bg-background">
@@ -184,6 +204,17 @@ export default function ChatPage({
   const peerBlockedMe = !!conv.peerBlockedMe; // собеседник заблокировал меня
   // Скрываем аватар/статус собеседника, только если ОН заблокировал меня.
   const peerOnline = !peerBlockedMe && (conv.online || isOnline(conv.peerId));
+  // Для личных чатов предпочитаем свежий профиль из облака, иначе — данные чата.
+  const headerAvatar = peerBlockedMe
+    ? undefined
+    : (isPrivate ? peerProfile?.avatar : "") || conv.avatar || undefined;
+  const headerInitials =
+    (isPrivate && peerProfile?.initials) || conv.initials;
+  const headerTitle =
+    (isPrivate && peerProfile?.name) || conv.title;
+  const headerOfficial =
+    conv.peerOfficial || !!peerProfile?.official || (isBot && conv.verified);
+  const headerBadge = peerProfile?.badge || conv.peerBadge;
   // Канал/группа, в которые вы ещё не вступили (открыты по ссылке)
   const notJoined =
     (isChannel || isGroup) && conv.isOwner !== true && conv.joined === false;
@@ -464,10 +495,10 @@ export default function ChatPage({
           >
             <div className="relative">
               <Avatar
-                initials={conv.initials}
+                initials={headerInitials}
                 color={conv.color}
                 size={40}
-                src={peerBlockedMe ? undefined : conv.avatar || undefined}
+                src={headerAvatar}
               />
               {!isChannel && (peerOnline || isBot) && (
                 <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-surface bg-green-500" />
@@ -475,10 +506,11 @@ export default function ChatPage({
             </div>
             <div className="min-w-0 flex-1">
               <p className="flex items-center gap-1 truncate text-[16px] font-semibold text-foreground">
-                <span className="truncate">{conv.title}</span>
-                {(conv.peerOfficial || (isBot && conv.verified)) && (
+                <span className="truncate">{headerTitle}</span>
+                {headerOfficial && (
                   <VerifiedBadge size={16} />
                 )}
+                {headerBadge && <BugHunterBadge size={16} />}
               </p>
               <p className="truncate text-[12px]">
                 {isChannel ? (
@@ -1036,7 +1068,7 @@ export default function ChatPage({
             }}
             className="w-full text-center text-[16px] font-semibold text-accent transition active:opacity-60"
           >
-            {conv.muted ? "Включить уведомления" : "Отключить уведомления"}
+            {conv.muted ? "Включить уведомления" : "Отключить уведомлен��я"}
           </button>
         </div>
       )}

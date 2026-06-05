@@ -26,6 +26,17 @@ const geistSans = Geist({
 export const metadata: Metadata = {
   title: "HouseGramX",
   description: "HouseGramX — современный мессенджер на Next.js 16 + React 19",
+  manifest: "/manifest.webmanifest",
+  applicationName: "HouseGramX",
+  appleWebApp: {
+    capable: true,
+    title: "HouseGramX",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/icon-192.png",
+  },
 };
 
 export const viewport: Viewport = {

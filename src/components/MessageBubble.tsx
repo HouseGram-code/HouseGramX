@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { motion } from "motion/react";
-import { Check, Checks, Clock, WarningCircle, FileArrowDown, MusicNotes } from "@phosphor-icons/react";
+import { Check, Checks, Clock, WarningCircle, FileArrowDown, MusicNotes, Play } from "@phosphor-icons/react";
 import { StickerImage } from "@/components/StickerImage";
 import { AnimatedReaction } from "@/components/AnimatedReaction";
 import { Avatar } from "@/components/Avatar";
@@ -10,6 +10,7 @@ import { RichText } from "@/components/RichText";
 import { getReaction } from "@/lib/reactions";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/lib/chat-store";
+import { MediaViewer, type MediaViewerItem } from "@/components/MediaViewer";
 
 interface MessageBubbleProps {
   message: Message;
@@ -38,6 +39,12 @@ export function MessageBubble({
   const mine = message.author === "me";
   const lastTap = useRef(0);
   const holdTimer = useRef<number | null>(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
+
+  const openViewer = (e?: ReactMouseEvent) => {
+    if (e) e.stopPropagation();
+    setViewerOpen(true);
+  };
 
   const handleTap = () => {
     if (!reactionsEnabled) return;
@@ -69,6 +76,14 @@ export function MessageBubble({
   const bare = isSticker || isVisualMedia;
   const reaction = message.reaction ? getReaction(message.reaction) : null;
   const withSender = showSender && !mine;
+  const mediaItem: MediaViewerItem | null =
+    isVisualMedia && message.mediaUrl
+      ? {
+          url: message.mediaUrl,
+          kind: message.mediaKind === "video" ? "video" : "image",
+          name: message.mediaName,
+        }
+      : null;
 
   return (
     <motion.div
@@ -130,7 +145,7 @@ export function MessageBubble({
             size={120}
           />
         ) : isMedia ? (
-          <MediaContent message={message} mine={mine} />
+          <MediaContent message={message} mine={mine} onOpen={openViewer} />
         ) : (
           <>
             {/* Переслано */}
@@ -220,6 +235,9 @@ export function MessageBubble({
           </motion.span>
         )}
       </div>
+      {viewerOpen && mediaItem && (
+        <MediaViewer item={mediaItem} onClose={() => setViewerOpen(false)} />
+      )}
     </motion.div>
   );
 }
@@ -233,7 +251,7 @@ function fmtBytes(bytes?: number): string {
 }
 
 /** Рендер вложения: фото, видео, аудио, файл + оверлей загрузки. */
-function MediaContent({ message, mine }: { message: Message; mine: boolean }) {
+function MediaContent({ message, mine, onOpen }: { message: Message; mine: boolean; onOpen?: () => void }) {
   const { mediaKind, mediaUrl, mediaName, mediaSize, uploadProgress } = message;
   const uploading = typeof uploadProgress === "number";
 
@@ -244,7 +262,8 @@ function MediaContent({ message, mine }: { message: Message; mine: boolean }) {
         <img
           src={mediaUrl}
           alt={mediaName ?? "фото"}
-          className="max-h-[320px] w-auto max-w-full object-cover"
+          onClick={onOpen}
+          className="max-h-[320px] w-auto max-w-full cursor-zoom-in object-cover"
           style={{ minWidth: 160 }}
         />
         {uploading && <UploadOverlay percent={uploadProgress!} />}
@@ -254,11 +273,13 @@ function MediaContent({ message, mine }: { message: Message; mine: boolean }) {
 
   if (mediaKind === "video") {
     return (
-      <div className="relative overflow-hidden rounded-2xl">
+      <div onClick={onOpen} className="relative cursor-pointer overflow-hidden rounded-2xl">
+        <PlayBadge />
         <video
           src={mediaUrl}
-          controls={!uploading}
+          muted
           playsInline
+          preload="metadata"
           className="max-h-[320px] w-auto max-w-full"
           style={{ minWidth: 200 }}
         />
@@ -346,5 +367,16 @@ function UploadOverlay({ percent }: { percent: number }) {
       </svg>
       <span className="absolute text-[12px] font-semibold text-white">{percent}%</span>
     </div>
+  );
+}
+
+/** Кружок «play» поверх превью видео в ленте сообщений. */
+function PlayBadge() {
+  return (
+    <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm">
+        <Play size={28} weight="fill" />
+      </span>
+    </span>
   );
 }

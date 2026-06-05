@@ -57,9 +57,18 @@ export function onSyncUserChange(cb: (id: string | null) => void): () => void {
 
 // ─── Локальный кэш ───────────────────────────────────────────────────────────
 
+/**
+ * Кэш разделяется по пользователю: к ключу добавляется его id. Это исключает
+ * «протекание» данных одного аккаунта в другой на общем устройстве
+ * (например, чужой аватар после смены аккаунта).
+ */
+function scopedKey(key: string): string {
+  return `${key}::${currentUserId ?? "anon"}`;
+}
+
 export function readCache<T>(key: string): T | null {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = localStorage.getItem(scopedKey(key));
     return raw ? (JSON.parse(raw) as T) : null;
   } catch {
     return null;
@@ -68,20 +77,27 @@ export function readCache<T>(key: string): T | null {
 
 export function writeCache(key: string, value: unknown) {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    localStorage.setItem(scopedKey(key), JSON.stringify(value));
   } catch {
     /* квота переполнена или хранилище недоступно — не критично */
   }
 }
 
-/** Очищает локальный кэш всех сторов (при выходе из аккаунта). */
+/** Очищает локальный кэш всех сторов и всех аккаунтов (при выходе). */
 export function clearAppCache() {
-  for (const key of STORE_KEYS) {
-    try {
-      localStorage.removeItem(key);
-    } catch {
-      /* ignore */
+  try {
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      // Удаляем как новые ключи с областью (key::uid), так и устаревшие глобальные.
+      if (STORE_KEYS.some((sk) => k === sk || k.startsWith(`${sk}::`))) {
+        toRemove.push(k);
+      }
     }
+    for (const k of toRemove) localStorage.removeItem(k);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -167,6 +183,12 @@ export function useCloudPersistence<T>({
   const snapRef = useRef(snapshot);
   const applyRef = useRef(applyData);
   const ready = useRef(false);
+  // JSON последнего синхронизированного снимка (кэш/облако).
+  const syncedRef = useRef<string | null>(null);
+  // Пользователь реально менял данные после гидратации.
+  const dirtyRef = useRef(false);
+  // Значения по умолчанию (исходный снимок) — для сброса при смене аккаунта.
+  const initialRef = useRef(snapshot);
 
   // Держим в ref-ах актуальные значения, не вызывая перерисовку.
   useEffect(() => {
@@ -179,14 +201,26 @@ export function useCloudPersistence<T>({
     let active = true;
 
     const cached = readCache<T>(key);
-    if (cached != null) applyRef.current(cached);
+    if (cached != null) {
+      syncedRef.current = JSON.stringify(cached);
+      applyRef.current(cached);
+    } else {
+      // Базовое состояние — чтобы гидратацию не приняли за правку.
+      syncedRef.current = JSON.stringify(snapRef.current);
+    }
     setHydrated(true);
 
     (async () => {
       const remote = await pull<T>(key);
       if (!active) return;
-      if (remote != null) {
+      if (dirtyRef.current) {
+        // Пользователь успел изменить данные до ответа облака — сохраняем их,
+        // не давая устаревшему облаку затереть свежую правку (напр. аватар).
+        push(key, snapRef.current);
+      } else if (remote != null) {
+        syncedRef.current = JSON.stringify(remote);
         applyRef.current(remote);
+        push(key, remote);
       } else if (getSyncUser()) {
         // У пользователя ещё нет облачных данных — переносим локальные.
         push(key, snapRef.current);
@@ -195,12 +229,34 @@ export function useCloudPersistence<T>({
     })();
 
     const off = onSyncUserChange((id) => {
-      if (!id) return; // выход — состояние очистит AuthProvider/перезагрузка
+      // Любая смена аккаунта обнуляет «грязный» флаг и сбрасывает состояние,
+      // чтобы данные прежнего пользователя (напр. аватар) не утекли в новый.
+      dirtyRef.current = false;
+      if (!id) {
+        syncedRef.current = JSON.stringify(initialRef.current);
+        applyRef.current(initialRef.current);
+        return;
+      }
       (async () => {
+        // Сначала — кэш именно этого пользователя (он разделён по id).
+        const cachedForUser = readCache<T>(key);
+        if (!active) return;
+        if (cachedForUser != null) {
+          syncedRef.current = JSON.stringify(cachedForUser);
+          applyRef.current(cachedForUser);
+        } else {
+          // Нет данных нового аккаунта — показываем значения по умолчанию
+          // и НИКОГДА не переносим в него данные прежнего пользователя.
+          syncedRef.current = JSON.stringify(initialRef.current);
+          applyRef.current(initialRef.current);
+        }
         const remote = await pull<T>(key);
         if (!active) return;
-        if (remote != null) applyRef.current(remote);
-        else push(key, snapRef.current); // миграция локальных данных в новый аккаунт
+        if (remote != null) {
+          syncedRef.current = JSON.stringify(remote);
+          applyRef.current(remote);
+          writeCache(key, remote);
+        }
         ready.current = true;
       })();
     });
@@ -214,7 +270,12 @@ export function useCloudPersistence<T>({
 
   // Сохранение при изменениях (после готовности, чтобы не затереть облако).
   useEffect(() => {
-    if (!hydrated || !ready.current) return;
+    if (!hydrated) return;
+    const current = JSON.stringify(snapshot);
+    // Изменения от гидратации/облака пропускаем; реагируем только на правки.
+    if (current === syncedRef.current) return;
+    syncedRef.current = current;
+    dirtyRef.current = true;
     push(key, snapshot);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshot, hydrated]);

@@ -166,7 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (typeof window !== "undefined") {
           try {
             window.localStorage.setItem(
-              "messenger.profile.v1",
+              `messenger.profile.v1::${data.user.id}`,
               JSON.stringify({
                 name: name ?? "",
                 username: extra?.username ?? "",

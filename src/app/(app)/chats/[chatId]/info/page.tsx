@@ -23,6 +23,8 @@ import {
 } from "@phosphor-icons/react";
 import { Avatar } from "@/components/Avatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { BugHunterBadge } from "@/components/BugHunterBadge";
+import { badgeMeta } from "@/lib/badges";
 import { useChats } from "@/lib/chat-store";
 import { usePresence } from "@/lib/presence-store";
 import { loadUserProfile, type UserProfile } from "@/lib/chat-remote";
@@ -89,6 +91,7 @@ export default function ChatInfoPage({
   const initials = peer?.initials ?? conv.initials;
   const username = peerBlockedMe ? undefined : peer?.username;
   const bio = peerBlockedMe ? undefined : peer?.bio || conv.description;
+  const badge = badgeMeta(peer?.badge || conv.peerBadge);
   const online = peerBlockedMe
     ? false
     : isPrivate
@@ -156,6 +159,7 @@ export default function ChatInfoPage({
             </h1>
             {isBot && <Robot size={20} weight="fill" className="text-accent" />}
             {(peer?.official || conv.peerOfficial) && <VerifiedBadge size={20} />}
+            {badge && <BugHunterBadge size={20} />}
             {conv.verified && !peer?.official && (
               <span className="text-accent">✓</span>
             )}
@@ -169,6 +173,23 @@ export default function ChatInfoPage({
             {statusText}
           </p>
         </motion.div>
+
+        {badge && (
+          <div className="mx-3 mb-2 rounded-2xl bg-surface p-4 ring-1 ring-separator">
+            <div className="flex items-center gap-2.5">
+              <BugHunterBadge size={34} />
+              <div className="min-w-0">
+                <p className="text-[15px] font-semibold text-foreground">
+                  {badge.label}
+                </p>
+                <p className="text-[12px] text-muted">{badge.short}</p>
+              </div>
+            </div>
+            <p className="mt-3 text-[14px] leading-relaxed text-foreground/80">
+              {badge.description}
+            </p>
+          </div>
+        )}
 
         {/* Быстрые действия */}
         <div className="grid grid-cols-3 gap-2 px-3">

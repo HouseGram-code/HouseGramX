@@ -260,6 +260,7 @@ begin
   begin execute 'alter publication supabase_realtime add table public.chats';        exception when duplicate_object then null; end;
   begin execute 'alter publication supabase_realtime add table public.chat_members';  exception when duplicate_object then null; end;
   begin execute 'alter publication supabase_realtime add table public.messages';      exception when duplicate_object then null; end;
+  begin execute 'alter publication supabase_realtime add table public.profiles';      exception when duplicate_object then null; end;
 end $$;
 
 -- ────────────────────────────────────────────────────────────────────────────

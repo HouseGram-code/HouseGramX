@@ -39,12 +39,20 @@ export default function NotificationsPage() {
 
   // При включении уведомлений просим разрешение браузера.
   const handleToggle = async (v: boolean) => {
+    if (v && !notificationsSupported()) {
+      show("Ваш браузер не поддерживает уведомления");
+      return;
+    }
     s.set("notificationsEnabled", v);
-    if (v && notificationsSupported()) {
+    if (v) {
       const ok = await requestNotificationPermission();
       setPerm(notificationPermission());
-      if (!ok && notificationPermission() === "denied") {
-        show("Уведомления заблокированы в браузере");
+      if (ok) {
+        show("Уведомления включены");
+      } else if (notificationPermission() === "denied") {
+        show("Уведомления заблокированы в настройках браузера");
+      } else {
+        show("Разрешите уведомления, чтобы получать оповещения");
       }
     }
   };
@@ -54,10 +62,20 @@ export default function NotificationsPage() {
     setPushBusy(true);
     try {
       if (v) {
+        if (!s.notificationsEnabled) s.set("notificationsEnabled", true);
+        const granted = await requestNotificationPermission();
+        setPerm(notificationPermission());
+        if (!granted) {
+          show("Сначала разрешите уведомления в браузере");
+          return;
+        }
         const ok = await subscribeToPush();
         setPushOn(ok);
-        setPerm(notificationPermission());
-        show(ok ? "Фоновые уведомления включены" : "Не удалось включить");
+        show(
+          ok
+            ? "Фоновые уведомления включены"
+            : "Не удалось включить push. Попробуйте перезагрузить страницу и повторить"
+        );
       } else {
         await unsubscribeFromPush();
         setPushOn(false);
@@ -115,7 +133,7 @@ export default function NotificationsPage() {
               label="Push при закрытом приложении"
               checked={pushOn}
               onChange={handlePushToggle}
-              disabled={pushBusy || !s.notificationsEnabled}
+              disabled={pushBusy}
               last
             />
           </Group>

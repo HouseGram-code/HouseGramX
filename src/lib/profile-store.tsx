@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -48,6 +49,9 @@ function makeInitials(name: string): string {
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile>(DEFAULTS);
   const [hydrated, setHydrated] = useState(false);
+  // Гарантия, что облачный профиль «зеркалит» локальный (один раз
+  // на аккаунт за сессию) — чинит аватары, которые не доехали до облака.
+  const reconciledFor = useRef<string | null>(null);
 
   useCloudPersistence<Profile>({
     key: STORAGE_KEY,
@@ -58,21 +62,26 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   });
 
   /** Публикуем имя/аватар в общедоступную таблицу profiles. */
-  const syncPublicProfile = (p: Profile) => {
+  const syncPublicProfile = async (p: Profile) => {
     if (!isSupabaseConfigured) return;
     const uid = getSyncUser();
     if (!uid) return;
-    void getSupabase()
-      .from("profiles")
-      .upsert({
-        id: uid,
-        name: p.name,
-        username: p.username,
-        avatar: p.avatar,
-        color: p.color,
-        bio: p.bio,
-        updated_at: new Date().toISOString(),
-      });
+    try {
+      const { error } = await getSupabase()
+        .from("profiles")
+        .upsert({
+          id: uid,
+          name: p.name,
+          username: p.username,
+          avatar: p.avatar,
+          color: p.color,
+          bio: p.bio,
+          updated_at: new Date().toISOString(),
+        });
+      if (error) console.warn("[profile] syncPublicProfile:", error.message);
+    } catch (e) {
+      console.warn("[profile] syncPublicProfile failed:", e);
+    }
   };
 
   /**
@@ -88,13 +97,17 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         .eq("id", uid)
         .maybeSingle();
       if (data && (data.name || data.username || data.avatar || data.bio)) {
+        // ВАЖНО: публичная таблица profiles — это лишь «зеркало» для других
+        // пользователей. Она НИКОГДА не должна перетирать собственные данные
+        // пользователя (иначе аватар «откатывается» на старый/чужой после
+        // перезагрузки). Берём облачные значения только для ПУСТЫХ локальных полей.
         setProfile((p) => ({
           ...p,
-          name: data.name || p.name,
-          username: data.username || p.username,
-          avatar: data.avatar || p.avatar,
-          color: data.color || p.color,
-          bio: data.bio || p.bio,
+          name: p.name || data.name || "",
+          username: p.username || data.username || "",
+          avatar: p.avatar || data.avatar || "",
+          color: p.color || data.color || p.color,
+          bio: p.bio || data.bio || "",
         }));
       } else {
         // Профиля ещё нет — создаём из текущих локальных данных.
@@ -108,6 +121,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   // При входе синхронизируем профиль с облаком.
   useEffect(() => {
     const off = onSyncUserChange((id) => {
+      reconciledFor.current = null;
       if (id) void syncFromCloud(id);
     });
     const cur = getSyncUser();
@@ -116,10 +130,25 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Самовосстановление: как только локальный профиль загружен, один раз
+  // на аккаунт пушим его в облако. Это гарантирует, что облачный профиль
+  // (который видят другие) всегда соответствует тому, что пользователь
+  // видит у себя — даже если предыдущая запись аватара не прошла.
+  useEffect(() => {
+    if (!hydrated || !isSupabaseConfigured) return;
+    const uid = getSyncUser();
+    if (!uid || reconciledFor.current === uid) return;
+    if (profile.name || profile.avatar || profile.username || profile.bio) {
+      reconciledFor.current = uid;
+      void syncPublicProfile(profile);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, profile]);
+
   const save = (patch: Partial<Profile>) =>
     setProfile((p) => {
       const next = { ...p, ...patch };
-      syncPublicProfile(next);
+      void syncPublicProfile(next);
       return next;
     });
 

@@ -1,15 +1,16 @@
-// Supabase Edge Function: рассылка Web Push при новом сообщении.
+// Supabase Edge Function: рассылка Web Push при новом сообщении (VAPID).
 //
 // Триггерится Database Webhook на INSERT в public.messages.
 // Находит участников чата (кроме автора), берёт их push-подписки и
-// отправляет фоновые уведомления через VAPID (npm:web-push).
+// шлёт фоновые уведомления через VAPID (npm:web-push). Доставку делает
+// push-сервис браузера (Google/Mozilla) — сторонние SaaS не нужны.
 //
-// Переменные окружения функции (Project Settings → Edge Functions → Secrets):
+// Секреты функции (Project Settings → Edge Functions → Secrets):
 //   SUPABASE_URL                — авто
-//   SUPABASE_SERVICE_ROLE_KEY   — авто (или задайте вручную)
+//   SUPABASE_SERVICE_ROLE_KEY   — авто
 //   VAPID_PUBLIC_KEY            — публичный VAPID-ключ
-//   VAPID_PRIVATE_KEY          — приватный VAPID-ключ
-//   VAPID_SUBJECT              — mailto:you@example.com (по желанию)
+//   VAPID_PRIVATE_KEY           — приватный VAPID-ключ
+//   VAPID_SUBJECT               — mailto:you@example.com (по желанию)
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
@@ -37,6 +38,30 @@ interface MessageRow {
   sender_name: string | null;
 }
 
+interface SubRow {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}
+
+// Короткое описание содержимого сообщения для тела уведомления.
+function previewOf(msg: MessageRow): string {
+  if (msg.text && msg.text.trim()) return msg.text.trim().slice(0, 120);
+  if (msg.sticker_emoji) return msg.sticker_emoji;
+  switch (msg.media_kind) {
+    case "photo":
+      return "📷 Фото";
+    case "video":
+      return "🎥 Видео";
+    case "audio":
+      return "🎤 Голосовое сообщение";
+    case "file":
+      return "📎 Файл";
+    default:
+      return "Новое сообщение";
+  }
+}
+
 Deno.serve(async (req) => {
   try {
     const payload = await req.json();
@@ -50,15 +75,13 @@ Deno.serve(async (req) => {
 
     // Данные чата (название) + участники.
     const [{ data: chat }, { data: members }] = await Promise.all([
-      admin.from("chats").select("title, kind").eq("id", msg.chat_id).maybeSingle(),
-      admin.from("chat_members").select("user_id, role").eq("chat_id", msg.chat_id),
+      admin.from("chats").select("title, kind").eq("id", msg.chat_id).single(),
+      admin.from("chat_members").select("user_id").eq("chat_id", msg.chat_id),
     ]);
 
     const recipientIds = (members ?? [])
-      .filter((m: { user_id: string; role: string }) =>
-        m.role !== "pending" && m.user_id !== msg.author_id
-      )
-      .map((m: { user_id: string }) => m.user_id);
+      .map((m: { user_id: string }) => m.user_id)
+      .filter((id: string) => id && id !== msg.author_id);
 
     if (recipientIds.length === 0) {
       return new Response("no recipients", { status: 200 });
@@ -66,67 +89,48 @@ Deno.serve(async (req) => {
 
     const { data: subs } = await admin
       .from("push_subscriptions")
-      .select("endpoint, p256dh, auth, user_id")
+      .select("endpoint, p256dh, auth")
       .in("user_id", recipientIds);
 
     if (!subs || subs.length === 0) {
-      return new Response("no subscriptions", { status: 200 });
+      return new Response("no subs", { status: 200 });
     }
 
-    const title = chat?.title || "HouseGramX";
-    const mediaLabel =
-      msg.media_kind === "image"
-        ? "📷 Фото"
-        : msg.media_kind === "video"
-          ? "🎬 Видео"
-          : msg.media_kind === "audio"
-            ? "🎵 Аудио"
-            : "📎 Файл";
-    const content =
-      msg.kind === "sticker"
-        ? `Стикер ${msg.sticker_emoji ?? "🙂"}`
-        : msg.kind === "media"
-          ? mediaLabel
-          : (msg.text ?? "Новое сообщение");
-    const body = (msg.sender_name ? `${msg.sender_name}: ` : "") + content;
+    const isGroup = chat?.kind === "group";
+    const sender = msg.sender_name || "Новое сообщение";
+    const title = isGroup ? chat?.title || "Новое сообщение" : sender;
+    const body = isGroup ? `${sender}: ${previewOf(msg)}` : previewOf(msg);
 
-    const notification = JSON.stringify({
+    const data = JSON.stringify({
       title,
-      body: body.slice(0, 140),
+      body,
       tag: msg.chat_id,
       url: `/chats/${msg.chat_id}`,
     });
 
-    const results = await Promise.allSettled(
-      subs.map((s: { endpoint: string; p256dh: string; auth: string }) =>
-        webpush.sendNotification(
-          { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-          notification
-        )
-      )
+    await Promise.all(
+      (subs as SubRow[]).map(async (s) => {
+        try {
+          await webpush.sendNotification(
+            { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+            data
+          );
+        } catch (err) {
+          const code = (err as { statusCode?: number })?.statusCode;
+          // 404/410 — подписка мёртвая, удаляем.
+          if (code === 404 || code === 410) {
+            await admin
+              .from("push_subscriptions")
+              .delete()
+              .eq("endpoint", s.endpoint);
+          }
+        }
+      })
     );
 
-    // Удаляем «протухшие» подписки (404/410).
-    const dead: string[] = [];
-    results.forEach((r, i) => {
-      if (
-        r.status === "rejected" &&
-        (r.reason?.statusCode === 404 || r.reason?.statusCode === 410)
-      ) {
-        dead.push(subs[i].endpoint);
-      }
-    });
-    if (dead.length) {
-      await admin.from("push_subscriptions").delete().in("endpoint", dead);
-    }
-
-    const sent = results.filter((r) => r.status === "fulfilled").length;
-    return new Response(JSON.stringify({ sent, total: subs.length }), {
-      headers: { "Content-Type": "application/json" },
-      status: 200,
-    });
+    return new Response("ok", { status: 200 });
   } catch (e) {
-    console.error("[push fn] error:", e);
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500 });
+    console.warn("[push] handler error:", e);
+    return new Response("error", { status: 200 });
   }
 });

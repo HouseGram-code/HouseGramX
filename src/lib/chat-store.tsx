@@ -129,6 +129,8 @@ export interface Conversation {
   peerId?: string;
   /** Собеседник — официальный (верифицированный) аккаунт. */
   peerOfficial?: boolean;
+  /** Бейдж собеседника (напр. "bug_hunter"). Пусто/undefined — нет бейджа. */
+  peerBadge?: string;
   /** Текущая активность собеседника (печатает/выбирает стикер). */
   activity?: Activity;
   verified?: boolean;
@@ -343,7 +345,7 @@ const SEED_BOT: Conversation = {
   kind: "bot",
   title: "Тест-бот",
   color: "linear-gradient(135deg,#9b59b6,#6c5ce7)",
-  initials: "��",
+  initials: "🤖",
   verified: true,
   online: true,
   messages: [
@@ -693,6 +695,44 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               };
             });
           }
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "profiles" },
+        (p) => {
+          // Собеседник обновил профиль (аватар/имя/цвет/галочка) —
+          // обновляем все наши личные чаты с ним «вживую», без
+          // перезагрузки страницы.
+          const row = p.new as {
+            id?: string;
+            name?: string;
+            avatar?: string;
+            color?: string;
+            official?: boolean;
+            badge?: string;
+          };
+          const meId = getSyncUser();
+          if (!row.id || row.id === meId) return;
+          setState((s) => {
+            let changed = false;
+            const next = { ...s.conversations };
+            for (const [cid, conv] of Object.entries(next)) {
+              if (conv.kind === "private" && conv.peerId === row.id) {
+                changed = true;
+                next[cid] = {
+                  ...conv,
+                  title: row.name || "Без имени",
+                  avatar: row.avatar || undefined,
+                  color: row.color || conv.color,
+                  initials: senderInitialsFrom(row.name || "?"),
+                  peerOfficial: !!row.official,
+                  peerBadge: row.badge || undefined,
+                };
+              }
+            }
+            return changed ? { conversations: next, order: s.order } : s;
+          });
         }
       )
       .subscribe((status) => {
@@ -1281,6 +1321,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           color: user.color,
           initials: user.initials,
           avatar: user.avatar || undefined,
+          peerId: user.id,
+          peerOfficial: user.official,
+          peerBadge: user.badge,
           joined: true,
           messages: [],
         };

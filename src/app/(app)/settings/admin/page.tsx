@@ -18,9 +18,11 @@ import {
   Megaphone,
   DownloadSimple,
   Wrench,
+  SealCheck,
 } from "@phosphor-icons/react";
 import { SubScreen } from "@/components/SubScreen";
 import { Avatar } from "@/components/Avatar";
+import { BugHunterBadge } from "@/components/BugHunterBadge";
 import { ConfirmSheet, type ConfirmConfig } from "@/components/ConfirmSheet";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/lib/auth-store";
@@ -29,6 +31,7 @@ import {
   fetchAllUsers,
   fetchStats,
   setBanned,
+  setBadge,
   setMaintenance,
   usersToCsv,
   isAdminEmail,
@@ -161,6 +164,39 @@ export default function AdminPage() {
                 )
               );
               show(willBan ? "Пользователь забанен" : "Пользователь разблокирован");
+            } catch (e) {
+              show(e instanceof Error ? e.message : "Ошибка");
+            } finally {
+              setBusyId(null);
+            }
+          },
+        },
+      ],
+    });
+  };
+
+  const toggleBadge = (target: AdminUser) => {
+    const has = !!target.badge;
+    setConfirm({
+      title: has ? "Снять галочку?" : "Выдать галочку «Багхантер»?",
+      message: has
+        ? `Снять отметку «Нашёл баги» у ${target.name || "@" + target.username}.`
+        : `${target.name || "@" + target.username} получит галочку «Нашёл баги» — её увидят все на его профиле.`,
+      actions: [
+        {
+          label: has ? "Снять" : "Выдать",
+          danger: has,
+          onClick: async () => {
+            setBusyId(target.id);
+            try {
+              const next = has ? "" : "bug_hunter";
+              await setBadge(target.id, next);
+              setUsers((prev) =>
+                prev.map((u) =>
+                  u.id === target.id ? { ...u, badge: next } : u
+                )
+              );
+              show(has ? "Галочка снята" : "Галочка выдана");
             } catch (e) {
               show(e instanceof Error ? e.message : "Ошибка");
             } finally {
@@ -414,6 +450,7 @@ export default function AdminPage() {
                   busy={busyId === u.id}
                   isSelf={u.id === user?.id}
                   onToggle={() => toggleBan(u)}
+                  onBadge={() => toggleBadge(u)}
                 />
               ))}
             </AnimatePresence>
@@ -482,12 +519,14 @@ function UserRow({
   busy,
   isSelf,
   onToggle,
+  onBadge,
 }: {
   u: AdminUser;
   last: boolean;
   busy: boolean;
   isSelf: boolean;
   onToggle: () => void;
+  onBadge: () => void;
 }) {
   const initials =
     (u.name || u.username || "?").trim().charAt(0).toUpperCase() || "?";
@@ -516,9 +555,10 @@ function UserRow({
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] font-medium text-foreground">
-          {u.name || "Без имени"}
-          {isSelf && <span className="ml-1.5 text-[12px] text-accent">(вы)</span>}
+        <p className="flex items-center gap-1 text-[15px] font-medium text-foreground">
+          <span className="truncate">{u.name || "Без имени"}</span>
+          {u.badge && <BugHunterBadge size={14} />}
+          {isSelf && <span className="text-[12px] text-accent">(вы)</span>}
         </p>
         <p className="flex items-center gap-0.5 truncate text-[13px] text-muted">
           {u.username ? (
@@ -531,6 +571,18 @@ function UserRow({
           )}
         </p>
       </div>
+
+      <button
+        type="button"
+        onClick={onBadge}
+        disabled={busy}
+        title={u.badge ? "Снять галочку" : "Выдать галочку «Нашёл баги»"}
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition active:scale-95 disabled:opacity-40 ${
+          u.badge ? "bg-emerald-500/15 text-emerald-500" : "bg-surface-2 text-muted"
+        }`}
+      >
+        <SealCheck size={18} weight={u.badge ? "fill" : "regular"} />
+      </button>
 
       <button
         type="button"

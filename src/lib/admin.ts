@@ -13,6 +13,7 @@ export interface AdminUser {
   color: string;
   bio: string;
   banned: boolean;
+  badge: string;
   last_seen: string | null;
   updated_at: string;
 }
@@ -27,7 +28,7 @@ export async function fetchAllUsers(): Promise<AdminUser[]> {
   if (!isSupabaseConfigured) return [];
   const { data, error } = await getSupabase()
     .from("profiles")
-    .select("id, name, username, avatar, color, bio, banned, last_seen, updated_at")
+    .select("id, name, username, avatar, color, bio, banned, badge, last_seen, updated_at")
     .order("updated_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as AdminUser[];
@@ -39,6 +40,19 @@ export async function setBanned(userId: string, banned: boolean): Promise<void> 
   const { error } = await getSupabase().rpc("admin_set_banned", {
     _user_id: userId,
     _banned: banned,
+  });
+  if (error) throw new Error(translateAdminError(error.message));
+}
+
+/**
+ * Выдаёт/снимает бейдж пользователю через защищённую RPC.
+ * badge: "" — снять, "bug_hunter" — выдать «Нашёл баги».
+ */
+export async function setBadge(userId: string, badge: string): Promise<void> {
+  if (!isSupabaseConfigured) throw new Error("Сервис недоступен");
+  const { error } = await getSupabase().rpc("admin_set_badge", {
+    _user_id: userId,
+    _badge: badge,
   });
   if (error) throw new Error(translateAdminError(error.message));
 }

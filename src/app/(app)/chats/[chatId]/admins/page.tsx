@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -18,6 +18,8 @@ import { ConfirmSheet, type ConfirmConfig } from "@/components/ConfirmSheet";
 import { useProfile } from "@/lib/profile-store";
 import { useContacts } from "@/lib/contacts-store";
 import { useChats } from "@/lib/chat-store";
+import { useAuth } from "@/lib/auth-store";
+import { loadChatMembers, type ChatMemberProfile } from "@/lib/chat-remote";
 import { useToast } from "@/components/Toast";
 
 export default function AdminsPage({
@@ -31,13 +33,107 @@ export default function AdminsPage({
   const { profile, initials } = useProfile();
   const { getContact } = useContacts();
   const { show } = useToast();
+  const { user } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
+  const [realMembers, setRealMembers] = useState<ChatMemberProfile[]>([]);
+
+  // Реальные участники из Supabase — чтобы участник мог видеть состав.
+  useEffect(() => {
+    let active = true;
+    loadChatMembers(chatId).then((m) => {
+      if (active) setRealMembers(m);
+    });
+    return () => {
+      active = false;
+    };
+  }, [chatId]);
+
   const conv = getConversation(chatId);
 
   if (!conv) return <SubScreen title="Не найдено">{null}</SubScreen>;
 
   const adminIds = conv.adminIds ?? [];
+  // Управление администраторами доступно только владельцу. Обычный
+  // участник видит список в режиме «только чтение».
+  const isOwner = conv.isOwner ?? false;
+
+  if (!isOwner) {
+    const staff = realMembers.filter(
+      (m) => m.role === "owner" || m.role === "admin"
+    );
+    const ownerContact = conv.ownerId ? getContact(conv.ownerId) : undefined;
+    return (
+      <SubScreen title="Администраторы">
+        {staff.length > 0 ? (
+          staff.map((m) => (
+            <div
+              key={m.userId}
+              className="flex w-full items-center gap-3 px-4 py-2.5"
+            >
+              <Avatar
+                initials={m.initials}
+                color={m.color}
+                size={48}
+                src={m.avatar || undefined}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] font-semibold text-foreground">
+                  {m.name}
+                  {m.userId === user?.id ? " (вы)" : ""}
+                </span>
+                <span className="block text-[13px] text-muted">
+                  {m.role === "owner" ? "Владелец" : "Администратор"}
+                </span>
+              </span>
+            </div>
+          ))
+        ) : ownerContact || adminIds.length > 0 ? (
+          <>
+            {ownerContact && (
+              <div className="flex w-full items-center gap-3 px-4 py-2.5">
+                <Avatar
+                  initials={ownerContact.initials}
+                  color={ownerContact.color}
+                  size={48}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-semibold text-foreground">
+                    {ownerContact.name}
+                  </span>
+                  <span className="block text-[13px] text-muted">Владелец</span>
+                </span>
+              </div>
+            )}
+            {adminIds.map((id) => {
+              const c = getContact(id);
+              if (!c) return null;
+              return (
+                <div
+                  key={id}
+                  className="flex w-full items-center gap-3 px-4 py-2.5"
+                >
+                  <Avatar initials={c.initials} color={c.color} size={48} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[15px] font-semibold text-foreground">
+                      {c.name}
+                    </span>
+                    <span className="block text-[13px] text-muted">
+                      Администратор
+                    </span>
+                  </span>
+                </div>
+              );
+            })}
+          </>
+        ) : (
+          <p className="px-4 py-10 text-center text-[14px] text-muted">
+            Список администраторов недоступен
+          </p>
+        )}
+      </SubScreen>
+    );
+  }
 
   return (
     <SubScreen

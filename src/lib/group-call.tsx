@@ -578,8 +578,18 @@ export function useGroupCall() {
 
 /**
  * Наблюдатель за активным звонком конкретного чата (для баннера «Идёт звонок»).
- * Читает таблицу call_sessions и подписывается на её изменения в реальном
- * времени. Не подключает медиа — только считает участников.
+ *
+ * Считает участников из ДВУХ независимых источников и берёт максимум:
+ *  1. Realtime Presence канала `call:{chatId}` — работает мгновенно и НЕ зависит
+ *     от базы данных. Это главный источник: как только кто-то зашёл в звонок
+ *     (вызвал channel.track()), наблюдатель сразу это видит. Сам наблюдатель в
+ *     presence НЕ участвует (не вызывает track()), поэтому других не «накручивает».
+ *  2. Таблица `call_sessions` (postgres realtime + опрос) — резерв на случай,
+ *     если presence по какой-то причине недоступен.
+ *
+ * Благодаря presence баннер «Идёт аудиозвонок» появляется у всех, кто открыл
+ * чат, даже если SQL-схема call_sessions ещё не применена или realtime для этой
+ * таблицы не включён. Медиа не подключается — только счётчик участников.
  */
 export function useCallWatch(chatId: string | null): {
   active: boolean;
@@ -595,16 +605,60 @@ export function useCallWatch(chatId: string | null): {
     const sb = getSupabase();
     let cancelled = false;
 
+    // Счётчики из двух источников; в UI отдаём максимум из них.
+    let presenceCount = 0;
+    let tableCount = 0;
+    const apply = () => {
+      if (!cancelled) setCount(Math.max(presenceCount, tableCount));
+    };
+
+    // ── Источник 1: Presence канала звонка (мгновенно, без БД) ──────────────
+    // Подписываемся на ТОТ ЖЕ топик, что и активные участники звонка
+    // (`call:{chatId}`), но НЕ вызываем track() — значит, сами в presence не
+    // попадаем, только читаем тех, кто реально в звонке.
+    const presenceChannel = sb.channel(`call:${chatId}`, {
+      config: {
+        presence: {
+          key: `watch-${Math.random().toString(36).slice(2, 10)}`,
+        },
+      },
+    });
+    const recomputePresence = () => {
+      const state = presenceChannel.presenceState() as Record<
+        string,
+        Array<{ userId?: string }>
+      >;
+      const ids = new Set<string>();
+      for (const key of Object.keys(state)) {
+        const meta = state[key]?.[0];
+        // Считаем только реальных участников звонка — у них есть userId.
+        if (meta?.userId) ids.add(meta.userId);
+      }
+      presenceCount = ids.size;
+      apply();
+    };
+    presenceChannel
+      .on("presence", { event: "sync" }, recomputePresence)
+      .on("presence", { event: "join" }, recomputePresence)
+      .on("presence", { event: "leave" }, recomputePresence)
+      .subscribe();
+
+    // ── Источник 2: таблица call_sessions (резерв) ──────────────────────────
     const refresh = async () => {
-      const { count: c } = await sb
-        .from("call_sessions")
-        .select("user_id", { count: "exact", head: true })
-        .eq("chat_id", chatId);
-      if (!cancelled) setCount(c ?? 0);
+      try {
+        const { count: c } = await sb
+          .from("call_sessions")
+          .select("user_id", { count: "exact", head: true })
+          .eq("chat_id", chatId);
+        tableCount = c ?? 0;
+        apply();
+      } catch {
+        /* таблица может быть не создана — не страшно, есть presence */
+      }
     };
     void refresh();
 
-    const channel = sb
+    const tableChannel = sb
       .channel(`call-watch:${chatId}`)
       .on(
         "postgres_changes",
@@ -624,7 +678,10 @@ export function useCallWatch(chatId: string | null): {
     // аудиозвонок» гарантированно появился у всех.
     const poll = window.setInterval(() => void refresh(), 4000);
     const onVisible = () => {
-      if (document.visibilityState === "visible") void refresh();
+      if (document.visibilityState === "visible") {
+        void refresh();
+        recomputePresence();
+      }
     };
     document.addEventListener("visibilitychange", onVisible);
 
@@ -632,7 +689,8 @@ export function useCallWatch(chatId: string | null): {
       cancelled = true;
       window.clearInterval(poll);
       document.removeEventListener("visibilitychange", onVisible);
-      sb.removeChannel(channel);
+      sb.removeChannel(presenceChannel);
+      sb.removeChannel(tableChannel);
     };
   }, [chatId]);
 
@@ -645,30 +703,35 @@ export function useCallWatch(chatId: string | null): {
  * участники видели звонок, даже не открывая чат. Realtime + опрос на случай,
  * если postgres_changes по call_sessions не доставлены.
  */
-export function useActiveCallChats(chatIds: string[]): Set<string> {
-  const [active, setActive] = useState<Set<string>>(() => new Set());
+export function useActiveCallChats(chatIds: string[]): Map<string, number> {
+  // chatId -> число участников, которые сейчас в звонке.
+  const [active, setActive] = useState<Map<string, number>>(() => new Map());
   // Стабильный ключ зависимости, чтобы не пересоздавать подписку каждый рендер.
   const key = chatIds.slice().sort().join(",");
 
   useEffect(() => {
     if (!isSupabaseConfigured || chatIds.length === 0) {
-      setActive(new Set());
+      setActive(new Map());
       return;
     }
     const sb = getSupabase();
     let cancelled = false;
 
     const refresh = async () => {
-      const { data } = await sb
-        .from("call_sessions")
-        .select("chat_id")
-        .in("chat_id", chatIds);
-      if (cancelled) return;
-      const next = new Set<string>();
-      for (const r of (data ?? []) as { chat_id: string }[]) {
-        next.add(r.chat_id);
+      try {
+        const { data } = await sb
+          .from("call_sessions")
+          .select("chat_id")
+          .in("chat_id", chatIds);
+        if (cancelled) return;
+        const next = new Map<string, number>();
+        for (const r of (data ?? []) as { chat_id: string }[]) {
+          next.set(r.chat_id, (next.get(r.chat_id) ?? 0) + 1);
+        }
+        setActive(next);
+      } catch {
+        /* таблица может быть не создана — индикатор просто не покажем */
       }
-      setActive(next);
     };
     void refresh();
 

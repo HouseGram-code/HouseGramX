@@ -4,14 +4,19 @@ import { getSupabase, isSupabaseConfigured } from "./supabase";
 import { getSyncUser } from "./sync";
 
 /**
- * Web Push: фоновые уведомления при закрытом приложении.
+ * Фоновые Web Push уведомления при закрытом приложении.
  *
- * Регистрирует service worker, подписывается через Push API с VAPID-ключом
- * и сохраняет подписку в таблицу push_subscriptions. Рассылку выполняет
- * Supabase Edge Function (см. supabase/functions/push).
+ * Родной Push API + VAPID: доставку выполняет push-сервис самого браузера
+ * (Google/Mozilla), без сторонних SaaS-доменов — работает там, где OneSignal заблокирован.
+ * Подписка сохраняется в таблицу push_subscriptions; рассылку выполняет
+ * Supabase Edge Function (см. supabase/functions/push и supabase/PUSH_SETUP.md).
  */
 
-const VAPID_PUBLIC = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+// Публичный VAPID-ключ. Берётся из переменной окружения, иначе — вшитый по умолчанию.
+// Публичный ключ безопасно держать в клиентском коде.
+const VAPID_PUBLIC =
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
+  "BM-_TCXEjpwcEfIHc3HyzY_NXyeViIxVOFz8Ab3pngIY-eOuQcT1lpmcRQKHtABng5Q6cRw0AIQjv2wrc6nga2E";
 
 export function pushSupported(): boolean {
   return (
@@ -44,8 +49,7 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
 }
 
 /**
- * Подписывается на push и сохраняет подписку в БД.
- * Возвращает true при успехе.
+ * Подписывается на push и сохраняет подписку в БД. Возвращает true при успехе.
  */
 export async function subscribeToPush(): Promise<boolean> {
   if (!pushSupported() || !VAPID_PUBLIC || !isSupabaseConfigured) return false;
@@ -117,7 +121,7 @@ export async function unsubscribeFromPush(): Promise<void> {
   }
 }
 
-/** Подписан ли сейчас браузер на push. */
+/** Подписано ли сейчас устройство на push. */
 export async function isPushSubscribed(): Promise<boolean> {
   if (!pushSupported()) return false;
   try {

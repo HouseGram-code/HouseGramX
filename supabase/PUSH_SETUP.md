@@ -1,85 +1,84 @@
-# Фоновые Web Push уведомления — настройка
+# Фоновые push-уведомления (Web Push / VAPID)
 
-Это включает уведомления, которые приходят **даже когда вкладка/браузер закрыты**.
-Слой состоит из 4 частей (весь код уже написан):
+HouseGramX использует **родной Web Push** браузера (Push API + VAPID).
+Доставку выполняет push-сервис самого браузера (Google / Mozilla), без сторонних
+сервисов. Это важно: **OneSignal и похожие SaaS заблокированы в ряде сетей (РФ)** —
+их SDK просто не загружается. Родной Web Push такой зависимости не имеет.
 
-1. **Service worker** `public/sw.js` — показывает уведомления в фоне.
-2. **Клиент** `src/lib/push.ts` — подписка + сохранение в таблицу `push_subscriptions`.
-   Переключатель в Настройки → Уведомления → «Push при закрытом приложении».
-3. **Таблица** `push_subscriptions` — уже в `schema.sql`.
-4. **Edge Function** `supabase/functions/push` — рассылает пуши при новом сообщении.
+## Архитектура
 
-## VAPID-ключи
+- **Клиент** (`src/lib/push.ts`): регистрирует service worker `public/sw.js`,
+  подписывается через `pushManager.subscribe` с публичным VAPID-ключом и сохраняет
+  подписку в таблицу `push_subscriptions`.
+- **Service worker** (`public/sw.js`): показывает уведомление по событию `push` и
+  открывает нужный чат по клику.
+- **Сервер** (`supabase/functions/push/index.ts`): Edge Function, которая по INSERT в
+  `messages` рассылает push участникам чата через `npm:web-push`.
 
-Уже сгенерированы и лежат в `.env.local`:
-
-```
-NEXT_PUBLIC_VAPID_PUBLIC_KEY=BM-_TCXEjpwcEfIHc3HyzY_NXyeViIxVOFz8Ab3pngIY-eOuQcT1lpmcRQKHtABng5Q6cRw0AIQjv2wrc6nga2E
-VAPID_PRIVATE_KEY=GMkNxB15_M3V7PYZNVgyn4PJue9B7Wm0IX66dhULR-c
-```
-
-Сгенерировать новые при необходимости: `node scripts/gen-vapid.mjs`
-
-## Шаги настройки (один раз)
-
-### 1. Применить обновлённую схему
-
-В дашборде → **SQL Editor** → выполните `supabase/schema.sql` ещё раз
-(добавилась таблица `push_subscriptions`). Скрипт идемпотентен.
-
-### 2. Установить Supabase CLI и залогиниться
+## Шаг 1. Сгенерировать VAPID-ключи (один раз)
 
 ```bash
-npm i -g supabase
-supabase login
-supabase link --project-ref sgzvjgxbdpiflpypqisd
+npx web-push generate-vapid-keys
 ```
 
-### 3. Задать секреты функции
+Получите пару: **Public Key** и **Private Key**.
 
-```bash
-supabase secrets set VAPID_PUBLIC_KEY=BM-_TCXEjpwcEfIHc3HyzY_NXyeViIxVOFz8Ab3pngIY-eOuQcT1lpmcRQKHtABng5Q6cRw0AIQjv2wrc6nga2E
-supabase secrets set VAPID_PRIVATE_KEY=GMkNxB15_M3V7PYZNVgyn4PJue9B7Wm0IX66dhULR-c
-supabase secrets set VAPID_SUBJECT=mailto:admin@housegramx.app
+> В проект уже вшит публичный ключ по умолчанию (в `src/lib/push.ts`), поэтому
+> клиентская подписка работает сразу. Если генерируете свою пару — пропишите
+> свой публичный ключ в `NEXT_PUBLIC_VAPID_PUBLIC_KEY`.
+
+## Шаг 2. Переменная окружения в Vercel (опционально)
+
+Если хотите использовать свой ключ вместо вшитого:
+
+```
+NEXT_PUBLIC_VAPID_PUBLIC_KEY = <ваш публичный ключ>
 ```
 
-(`SUPABASE_URL` и `SUPABASE_SERVICE_ROLE_KEY` доступны функции автоматически.)
+После добавления — **Redeploy** (NEXT_PUBLIC_* вшиваются на сборке).
 
-### 4. Задеплоить функцию
+## Шаг 3. Секреты Edge Function (для авторассылки)
+
+Project Settings → Edge Functions → Secrets:
+
+```
+VAPID_PUBLIC_KEY  = <публичный ключ>
+VAPID_PRIVATE_KEY = <приватный ключ>
+VAPID_SUBJECT     = mailto:you@example.com
+```
+
+`SUPABASE_URL` и `SUPABASE_SERVICE_ROLE_KEY` подставляются автоматически.
+
+## Шаг 4. Развернуть функцию
 
 ```bash
 supabase functions deploy push --no-verify-jwt
 ```
 
-Флаг `--no-verify-jwt` нужен, потому что вызывать её будет Database Webhook
-(без пользовательского JWT). Доступ к данным внутри идёт через service_role.
+## Шаг 5. Database Webhook
 
-### 5. Создать Database Webhook на новые сообщения
+Database → Webhooks → Create:
+- Таблица: `public.messages`
+- Событие: `INSERT`
+- Type: **Supabase Edge Functions** → функция `push`
 
-Дашборд → **Database → Webhooks → Create a new hook**:
+После этого каждое новое сообщение будет бить в функцию, и участники получат push.
 
-- **Name**: `push-on-message`
-- **Table**: `public.messages`
-- **Events**: ☑ Insert
-- **Type**: Supabase Edge Functions
-- **Edge Function**: `push`
-- **Method**: POST
-- Save.
+## Шаг 6. Клиент
 
-Теперь при каждом новом сообщении вебхук вызывает функцию `push`, она находит
-участников чата (кроме автора), берёт их подписки и шлёт фоновые уведомления.
+В приложении: Настройки → Уведомления → включить **«Push при закрытом
+приложении»**. Браузер попросит разрешение — подтвердите.
+
+## iOS
+
+Na iPhone/iPad фоновые push работают только в iOS 16.4+ и только если сайт
+добавлен на домашний экран (Share → Add to Home Screen) и запущен оттуда.
+Это ограничение Apple, оно касается любых веб-push, не только этого приложения.
 
 ## Проверка
 
-1. `npm run dev`, войдите, откройте Настройки → Уведомления →
-   включите «Push при закрытом приложении» (браузер попросит разрешение).
-2. **Полностью закройте вкладку** приложения.
-3. С другого аккаунта/устройства напишите вам сообщение.
-4. Должно прийти системное уведомление. Клик по нему открывает нужный чат.
+1. Откройте сайт в двух разных браузерах/устройствах под разными аккаунтами.
+2. В обоих включите push.
+3. Закройте один, напишите из другого — должно прийти фоновое уведомление.
 
-## Замечания
-
-- Работает только по HTTPS (или localhost). На реальном домене — обязателен HTTPS.
-- iOS Safari: уведомления работают только для PWA, добавленного на главный экран
-  (iOS 16.4+). На десктопе Chrome/Edge/Firefox и Android Chrome — без проблем.
-- Если меняете VAPID-ключи — пользователям нужно переподписаться (выкл/вкл тумблер).
+Для отладки см. логи функции: Edge Functions → push → Logs.

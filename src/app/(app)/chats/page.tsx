@@ -1,22 +1,26 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import {
   MagnifyingGlass,
+  At,
   Plus,
   QrCode,
   ChatsCircle,
   Megaphone,
   PencilSimpleLine,
   UsersThree,
+  Phone,
 } from "@phosphor-icons/react";
 import { Avatar } from "@/components/Avatar";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { useAuth } from "@/lib/auth-store";
 import { PopoverMenu } from "@/components/PopoverMenu";
 import { useChats, type Conversation } from "@/lib/chat-store";
 import { useActiveCallChats } from "@/lib/group-call";
-import { countUnread } from "@/lib/chat-remote";
+import { countUnread, searchUsers, type FoundUser } from "@/lib/chat-remote";
 import { usePresence } from "@/lib/presence-store";
 import { ConnectionTitle } from "@/components/ConnectionTitle";
 import { cn } from "@/lib/utils";
@@ -65,8 +69,9 @@ function lastPreview(conv: Conversation) {
 
 export default function ChatsPage() {
   const router = useRouter();
-  const { conversations, activeCall } = useChats();
+  const { conversations, activeCall, startDirectChat } = useChats();
   const { isOnline } = usePresence();
+  const { user } = useAuth();
   // Чаты, в которых прямо сейчас идёт групповой звонок (у любого
   // участника), чтобы показать индикатор «Идёт звонок» в списке.
   const callChatIds = useMemo(
@@ -77,6 +82,41 @@ export default function ChatsPage() {
   const [filter, setFilter] = useState<ChatFilter>("all");
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [people, setPeople] = useState<FoundUser[]>([]);
+  const [peopleLoading, setPeopleLoading] = useState(false);
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  const peopleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Глобальный поиск людей по имени/@username (как в Telegram).
+  useEffect(() => {
+    const q = query.trim();
+    if (peopleTimer.current) clearTimeout(peopleTimer.current);
+    if (!q || !user) {
+      setPeople([]);
+      setPeopleLoading(false);
+      return;
+    }
+    setPeopleLoading(true);
+    peopleTimer.current = setTimeout(async () => {
+      const found = await searchUsers(q, user.id);
+      setPeople(found);
+      setPeopleLoading(false);
+    }, 350);
+    return () => {
+      if (peopleTimer.current) clearTimeout(peopleTimer.current);
+    };
+  }, [query, user]);
+
+  const openPerson = async (u: FoundUser) => {
+    setOpeningId(u.id);
+    try {
+      const id = await startDirectChat(u);
+      router.push(`/chats/${id}`);
+    } catch {
+      setOpeningId(null);
+    }
+  };
 
   const visible = useMemo(() => {
     let list = [...conversations];
@@ -97,6 +137,7 @@ export default function ChatsPage() {
             <button
               type="button"
               aria-label="Поиск"
+              onClick={() => searchRef.current?.focus()}
               className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-muted transition active:scale-90"
             >
               <MagnifyingGlass size={20} weight="bold" />
@@ -139,6 +180,7 @@ export default function ChatsPage() {
         <div className="mt-3 flex items-center gap-2 rounded-2xl bg-surface-2 px-3 py-2.5">
           <MagnifyingGlass size={18} weight="bold" className="text-muted-2" />
           <input
+            ref={searchRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Поиск"
@@ -181,8 +223,7 @@ export default function ChatsPage() {
 
       {/* Список чатов */}
       <div className="no-scrollbar flex-1 overflow-y-auto border-t border-separator">
-        {visible.length > 0 ? (
-          visible.map((conv, i) => {
+        {visible.map((conv, i) => {
             const preview = lastPreview(conv);
             const unread = countUnread(conv);
             return (
@@ -221,28 +262,20 @@ export default function ChatsPage() {
                       />
                     )}
                     {conv.kind === "group" && (
-                      <UsersThree
-                        size={14}
-                        weight="fill"
-                        className="shrink-0 text-muted-2"
-                      />
+                      <span className="flex shrink-0 items-center gap-0.5 text-muted-2">
+                        <UsersThree size={14} weight="fill" />
+                        <span className="text-[11px] font-medium leading-none">
+                          {conv.subscribers ?? 1 + (conv.memberIds?.length ?? 0)}
+                        </span>
+                      </span>
                     )}
                     {(activeCall?.chatId === conv.id ||
-                      activeCallChats.has(conv.id)) && (
-                      <span className="flex shrink-0 items-end gap-[2px]">
-                        {[0, 1, 2].map((i) => (
-                          <motion.span
-                            key={i}
-                            className="block w-[2px] rounded-full bg-green-500"
-                            animate={{ height: [4, 11, 4] }}
-                            transition={{
-                              duration: 0.8,
-                              repeat: Infinity,
-                              delay: i * 0.12,
-                              ease: "easeInOut",
-                            }}
-                          />
-                        ))}
+                      (activeCallChats.get(conv.id) ?? 0) > 0) && (
+                      <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-green-500/15 px-1.5 py-[1px] text-[11px] font-semibold leading-none text-green-600">
+                        <Phone size={11} weight="fill" />
+                        {(activeCallChats.get(conv.id) ?? 0) > 0
+                          ? activeCallChats.get(conv.id)
+                          : ""}
                       </span>
                     )}
                     {conv.verified && (
@@ -275,10 +308,24 @@ export default function ChatsPage() {
                 </div>
               </motion.button>
             );
-          })
-        ) : (
-          <EmptyChats hasQuery={query.trim().length > 0} />
+          })}
+
+        {query.trim() && (
+          <PeopleSection
+            people={people}
+            loading={peopleLoading}
+            openingId={openingId}
+            onOpen={openPerson}
+          />
         )}
+
+        {visible.length === 0 && !query.trim() && (
+          <EmptyChats hasQuery={false} />
+        )}
+        {visible.length === 0 &&
+          query.trim() &&
+          !peopleLoading &&
+          people.length === 0 && <EmptyChats hasQuery={true} />}
       </div>
     </div>
   );
@@ -303,6 +350,65 @@ function EmptyChats({ hasQuery }: { hasQuery: boolean }) {
           {hasQuery ? "Попробуйте изменить запрос" : "Начните новую переписку"}
         </p>
       </div>
+    </div>
+  );
+}
+
+/** Секция «Глобальный поиск»: найденные люди, тап — начать чат. */
+function PeopleSection({
+  people,
+  loading,
+  openingId,
+  onOpen,
+}: {
+  people: FoundUser[];
+  loading: boolean;
+  openingId: string | null;
+  onOpen: (u: FoundUser) => void;
+}) {
+  if (!loading && people.length === 0) return null;
+  return (
+    <div className="pb-4">
+      <p className="px-4 pb-1 pt-3 text-[13px] font-semibold uppercase tracking-wide text-muted-2">
+        Глобальный поиск
+      </p>
+      {loading && people.length === 0 ? (
+        <div className="flex justify-center py-6">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+        </div>
+      ) : (
+        people.map((u) => (
+          <button
+            key={u.id}
+            type="button"
+            disabled={openingId !== null}
+            onClick={() => onOpen(u)}
+            className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-2/70 active:bg-surface-2 disabled:opacity-50"
+          >
+            <Avatar
+              initials={u.initials}
+              color={u.color}
+              size={48}
+              src={u.avatar || undefined}
+            />
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1 text-[15px] font-semibold text-foreground">
+                <span className="truncate">{u.name}</span>
+                {u.official && <VerifiedBadge size={16} />}
+              </span>
+              {u.username && (
+                <span className="flex items-center gap-0.5 text-[13px] text-muted">
+                  <At size={12} weight="bold" />
+                  {u.username}
+                </span>
+              )}
+            </span>
+            {openingId === u.id && (
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+            )}
+          </button>
+        ))
+      )}
     </div>
   );
 }
