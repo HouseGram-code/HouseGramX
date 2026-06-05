@@ -47,7 +47,7 @@ import { loadUserProfile, type UserProfile } from "@/lib/chat-remote";
 import { useGroupCall, useCallWatch } from "@/lib/group-call";
 import { useChatTyping } from "@/lib/typing";
 import { useSettings } from "@/lib/settings-store";
-import { useStickers } from "@/lib/stickers-store";
+import { useStickers, type StickerSet } from "@/lib/stickers-store";
 import { useProfile } from "@/lib/profile-store";
 import { usePresence } from "@/lib/presence-store";
 import { setActiveChat } from "@/lib/notify";
@@ -93,7 +93,7 @@ export default function ChatPage({
     joinChat,
     clearHistory,
   } = useChats();
-  const { useSticker, useEmoji } = useStickers();
+  const { useSticker, useEmoji, findSetBySticker } = useStickers();
   const { show } = useToast();
   const { profile } = useProfile();
   const { isOnline } = usePresence();
@@ -103,6 +103,8 @@ export default function ChatPage({
 
   const [draft, setDraft] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Набор стикеров, открытый по тапу на присланный стикер.
+  const [stickerSheet, setStickerSheet] = useState<StickerSet | null>(null);
   const [attachOpen, setAttachOpen] = useState(false);
   const [activeMsg, setActiveMsg] = useState<string | null>(null);
   const [muteSheet, setMuteSheet] = useState(false);
@@ -934,6 +936,11 @@ export default function ChatPage({
               reactionsEnabled={s.quickReactionEnabled}
               onQuickReact={() => setReaction(conv.id, m.id, s.quickReaction)}
               onOpenActions={() => setActiveMsg(m.id)}
+              onOpenSticker={(msg) =>
+                setStickerSheet(
+                  findSetBySticker(msg.stickerSrc, msg.stickerSetId) ?? null,
+                )
+              }
               showSender={isGroup}
             />
           );
