@@ -518,7 +518,7 @@ export default function ChatPage({
               <p className="truncate text-[12px]">
                 {isChannel ? (
                   <span className="text-muted">
-                    {subsLabel(conv.subscribers ?? 1)}
+                    {subsLabel(Math.max(0, (conv.subscribers ?? 1) - 1))}
                   </span>
                 ) : isGroup ? (
                   someoneTyping ? (
@@ -798,7 +798,7 @@ export default function ChatPage({
               <p className="text-[13px] text-muted">
                 {isGroup
                   ? `${conv.subscribers ?? 1} участник(ов)`
-                  : `${conv.subscribers ?? 1} подписчик(ов)`}
+                  : `${Math.max(0, (conv.subscribers ?? 1) - 1)} подписчик(ов)`}
               </p>
               {conv.description && (
                 <p className="mt-1 text-[14px] leading-relaxed text-foreground/80">
@@ -835,7 +835,7 @@ export default function ChatPage({
               Сегодня
             </div>
             <div className="rounded-full bg-accent/15 px-3 py-1 text-[12px] text-accent">
-              Канал создан
+              Канал созд��н
             </div>
           </div>
         )}

@@ -83,6 +83,8 @@ export default function ChatInfoPage({
   const iBlockedPeer = !!conv.blocked; // я заблокировал собеседника
   const peerBlockedMe = !!conv.peerBlockedMe; // собеседник заблокировал меня
   const subs = conv.subscribers ?? 1;
+  // Создатель не считается подписчиком (как в Telegram).
+  const channelSubs = Math.max(0, subs - 1);
   const adminsCount = 1 + (conv.adminIds?.length ?? 0);
   // Список подписчиков виден только владельцу и администраторам канала.
   const isStaff =
@@ -105,7 +107,7 @@ export default function ChatInfoPage({
       : isBot;
 
   const statusText = isChannel
-    ? subsLabel(subs)
+    ? subsLabel(channelSubs)
     : isBot
       ? "бот"
       : peerBlockedMe
@@ -281,7 +283,7 @@ export default function ChatInfoPage({
                   <Row
                     icon={UsersThree}
                     title="Подписчики"
-                    value={String(subs)}
+                    value={String(channelSubs)}
                     onClick={() => router.push(`/chats/${chatId}/subscribers`)}
                     last
                   />

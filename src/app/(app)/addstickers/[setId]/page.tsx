@@ -67,7 +67,7 @@ export default function AddStickersPage({
         return;
       }
     } catch {
-      return;
+      // отмена/ошибка — копируем ссылку как запасной вариант
     }
     try {
       await navigator.clipboard?.writeText(url);
@@ -83,7 +83,11 @@ export default function AddStickersPage({
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-separator bg-surface/95 px-3 py-3 backdrop-blur-xl">
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1)
+              router.back();
+            else router.replace("/chats");
+          }}
           aria-label="Назад"
           className="flex h-9 w-9 items-center justify-center rounded-full text-foreground transition hover:bg-surface-2"
         >
@@ -170,7 +174,7 @@ export default function AddStickersPage({
                 className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-accent text-[15px] font-semibold text-white shadow-sm transition active:scale-[0.99]"
               >
                 <Plus size={20} weight="bold" />
-                Добавить {plural(set.stickers.length, "стикер", "стикера", "стикеров")}
+                Взять стикеры
               </button>
             )}
           </div>

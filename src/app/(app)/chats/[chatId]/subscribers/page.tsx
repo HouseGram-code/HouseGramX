@@ -51,7 +51,8 @@ export default function SubscribersPage({
   }
 
   const memberIds = conv.memberIds ?? [];
-  const subs = conv.subscribers ?? 1;
+  // Создатель не считается подписчиком (как в Telegram).
+  const subs = Math.max(0, (conv.subscribers ?? 1) - 1);
   const isAdmin = (id: string) => (conv.adminIds ?? []).includes(id);
 
   return (

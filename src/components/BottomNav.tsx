@@ -19,7 +19,8 @@ export function BottomNav() {
   // Скрываем на экранах-«деталях» (открытый чат, подэкраны настроек).
   const isDetail =
     /^\/chats\/[^/]+/.test(pathname) ||
-    /^\/settings\/.+/.test(pathname);
+    /^\/settings\/.+/.test(pathname) ||
+    /^\/addstickers\//.test(pathname);
 
   if (isDetail) return null;
 
