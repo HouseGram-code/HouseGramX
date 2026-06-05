@@ -31,6 +31,7 @@ import { BugHunterBadge } from "@/components/BugHunterBadge";
 import { MessageBubble } from "@/components/MessageBubble";
 import { ChannelPost } from "@/components/ChannelPost";
 import { StickerPicker } from "@/components/StickerPicker";
+import { StickerSetSheet } from "@/components/StickerSetSheet";
 import {
   MessageActions,
   ActionIcons,
