@@ -17,6 +17,7 @@ import { GroupCallProvider } from "@/lib/group-call";
 import { PresenceProvider } from "@/lib/presence-store";
 import { ConnectionProvider } from "@/lib/connection-store";
 import { ToastProvider } from "@/components/Toast";
+import { ErrorSilencer } from "@/components/ErrorSilencer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -65,6 +66,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
       </head>
       <body className="min-h-full bg-background">
+        <ErrorSilencer />
         <AuthProvider>
           <AuthGate>
             <MaintenanceProvider>

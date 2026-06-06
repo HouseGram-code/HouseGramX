@@ -31,7 +31,7 @@ import { loadUserProfile, type UserProfile } from "@/lib/chat-remote";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/lib/auth-store";
 import { useSettings } from "@/lib/settings-store";
-import { formatLastSeen } from "@/lib/utils";
+import { formatLastSeen, fallbackLastSeen } from "@/lib/utils";
 
 function subsLabel(n: number) {
   const m10 = n % 10;
@@ -115,7 +115,11 @@ export default function ChatInfoPage({
         : online
           ? "в сети"
           : s.lastSeenVisibility === "everyone"
-            ? formatLastSeen(peer?.lastSeen ?? conv.lastSeen)
+            ? formatLastSeen(
+                peer?.lastSeen ??
+                  conv.lastSeen ??
+                  fallbackLastSeen(conv.peerId ?? conv.id),
+              )
             : "был(а) недавно";
 
   return (

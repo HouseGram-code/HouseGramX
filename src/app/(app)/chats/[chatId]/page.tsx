@@ -53,7 +53,7 @@ import { usePresence } from "@/lib/presence-store";
 import { setActiveChat } from "@/lib/notify";
 import { useRecorder } from "@/lib/use-recorder";
 import { useToast } from "@/components/Toast";
-import { formatLastSeen } from "@/lib/utils";
+import { formatLastSeen, fallbackLastSeen } from "@/lib/utils";
 
 const CHANNEL_REACTIONS = ["👍", "❤️", "😂", "🔥", "😢", "😍", "👌"];
 
@@ -541,7 +541,10 @@ export default function ChatPage({
                 ) : (
                   <span className="text-muted">
                     {s.lastSeenVisibility === "everyone"
-                      ? formatLastSeen(conv.lastSeen)
+                      ? formatLastSeen(
+                          conv.lastSeen ??
+                            fallbackLastSeen(conv.peerId ?? conv.id),
+                        )
                       : "был(а) недавно"}
                   </span>
                 )}
