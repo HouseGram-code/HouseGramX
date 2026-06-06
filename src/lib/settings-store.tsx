@@ -11,6 +11,9 @@ import { useCloudPersistence } from "./sync";
 
 export type Theme = "light" | "dark" | "system";
 
+/** Кто видит время моей активности (последний визит). */
+export type LastSeenVisibility = "everyone" | "contacts" | "nobody";
+
 export interface SettingsState {
   theme: Theme;
   // Уведомления
@@ -22,6 +25,8 @@ export interface SettingsState {
   passcode: boolean;
   twoFactor: boolean;
   readReceipts: boolean;
+  // Кто видит мой статус (время последней активности)
+  lastSeenVisibility: LastSeenVisibility;
   // Сообщения
   enterToSend: boolean;
   largeEmoji: boolean;
@@ -46,6 +51,7 @@ const DEFAULTS: SettingsState = {
   passcode: false,
   twoFactor: false,
   readReceipts: true,
+  lastSeenVisibility: "everyone",
   enterToSend: true,
   largeEmoji: true,
   fontSize: 16,

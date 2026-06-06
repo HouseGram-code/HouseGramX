@@ -30,6 +30,7 @@ import { usePresence } from "@/lib/presence-store";
 import { loadUserProfile, type UserProfile } from "@/lib/chat-remote";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/lib/auth-store";
+import { useSettings } from "@/lib/settings-store";
 import { formatLastSeen } from "@/lib/utils";
 
 function subsLabel(n: number) {
@@ -52,6 +53,7 @@ export default function ChatInfoPage({
   const { isOnline } = usePresence();
   const { show } = useToast();
   const { user } = useAuth();
+  const s = useSettings();
 
   const conv = getConversation(chatId);
   const [peer, setPeer] = useState<UserProfile | null>(null);
@@ -112,7 +114,9 @@ export default function ChatInfoPage({
         ? "был(а) давно"
         : online
           ? "в сети"
-          : formatLastSeen(peer?.lastSeen ?? conv.lastSeen);
+          : s.lastSeenVisibility === "everyone"
+            ? formatLastSeen(peer?.lastSeen ?? conv.lastSeen)
+            : "был(а) недавно";
 
   return (
     <div className="flex h-full flex-1 flex-col bg-background">

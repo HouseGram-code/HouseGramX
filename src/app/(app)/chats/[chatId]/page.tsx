@@ -540,7 +540,9 @@ export default function ChatPage({
                   <span className="text-green-500">в сети</span>
                 ) : (
                   <span className="text-muted">
-                    {formatLastSeen(conv.lastSeen)}
+                    {s.lastSeenVisibility === "everyone"
+                      ? formatLastSeen(conv.lastSeen)
+                      : "был(а) недавно"}
                   </span>
                 )}
               </p>
