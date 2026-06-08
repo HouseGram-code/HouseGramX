@@ -167,11 +167,19 @@ export function useLastSeen(
       setTs(v ? new Date(v).getTime() : undefined);
     };
     void fetchLastSeen();
-    // Обновляем раз в минуту, чтобы «был N мин назад» оставалось актуальным.
-    const iv = setInterval(fetchLastSeen, 60_000);
+    // Обновляем раз в 30 сек, чтобы «был N мин назад» оставалось актуальным.
+    const iv = setInterval(fetchLastSeen, 30_000);
+    // И сразу обновляем, когда пользователь возвращается к вкладке (как в Telegram).
+    const onFocus = () => {
+      if (document.visibilityState === "visible") void fetchLastSeen();
+    };
+    document.addEventListener("visibilitychange", onFocus);
+    window.addEventListener("focus", onFocus);
     return () => {
       cancelled = true;
       clearInterval(iv);
+      document.removeEventListener("visibilitychange", onFocus);
+      window.removeEventListener("focus", onFocus);
     };
   }, [userId, online]);
 

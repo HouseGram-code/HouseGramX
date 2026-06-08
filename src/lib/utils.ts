@@ -45,10 +45,13 @@ export function formatLastSeen(ts?: number): string {
   if (dayDiff === 0) return `был(а) в сети сегодня в ${time}`;
   if (dayDiff === 1) return `был(а) в сети вчера в ${time}`;
 
+  // Как в Telegram: для более старых дат показываем дату С временем,
+  // например «был(а) в сети 5 июня в 14:30». Год показываем только если он отличается.
+  const sameYear = seen.getFullYear() === now.getFullYear();
   const date = seen.toLocaleDateString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
+    day: "numeric",
+    month: "long",
+    ...(sameYear ? {} : { year: "numeric" }),
   });
-  return `был(а) в сети ${date}`;
+  return `был(а) в сети ${date} в ${time}`;
 }
