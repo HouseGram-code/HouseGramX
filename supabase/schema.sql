@@ -54,6 +54,13 @@ create table if not exists public.profiles (
 alter table public.profiles
   add column if not exists official boolean not null default false;
 
+-- Время последнего визита («был(а) в сети…»).
+-- ВАЖНО: create table if not exists НЕ добавляет колонки в уже существующую
+-- таблицу, поэтому добавляем last_seen идемпотентно — иначе на старых базах
+-- колонки нет и статус «был(а) в сети» не обновляется.
+alter table public.profiles
+  add column if not exists last_seen timestamptz;
+
 alter table public.profiles enable row level security;
 
 drop policy if exists "profiles_select_all" on public.profiles;
