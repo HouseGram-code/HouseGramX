@@ -14,7 +14,6 @@ import {
   UsersThree,
   Phone,
   Archive,
-  ArchiveBox,
   BellSlash,
   Bell,
   Trash,
@@ -463,7 +462,7 @@ export default function ChatsPage() {
             style={ { top: ctxMenu.y, left: ctxMenu.x } }
           >
             <CtxItem
-              icon={ctxMenu.conv.archived ? ArchiveBox : Archive}
+              icon={Archive}
               label={ctxMenu.conv.archived ? "Из архива" : "Архивировать"}
               onClick={() => {
                 setArchived(ctxMenu.conv.id, !ctxMenu.conv.archived);
