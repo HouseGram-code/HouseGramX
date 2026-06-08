@@ -13,12 +13,19 @@ import {
   PencilSimpleLine,
   UsersThree,
   Phone,
+  Archive,
+  ArchiveBox,
+  BellSlash,
+  Bell,
+  Trash,
+  CaretRight,
+  ChatText,
 } from "@phosphor-icons/react";
 import { Avatar } from "@/components/Avatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { useAuth } from "@/lib/auth-store";
 import { PopoverMenu } from "@/components/PopoverMenu";
-import { useChats, type Conversation } from "@/lib/chat-store";
+import { useChats, type Conversation, type Message } from "@/lib/chat-store";
 import { useActiveCallChats } from "@/lib/group-call";
 import { countUnread, searchUsers, type FoundUser } from "@/lib/chat-remote";
 import { usePresence } from "@/lib/presence-store";
@@ -70,7 +77,8 @@ function lastPreview(conv: Conversation) {
 
 export default function ChatsPage() {
   const router = useRouter();
-  const { conversations, activeCall, startDirectChat } = useChats();
+  const { conversations, activeCall, startDirectChat, setArchived, setMuted, deleteChat } =
+    useChats();
   const { isOnline } = usePresence();
   const { user } = useAuth();
   // Чаты, в которых прямо сейчас идёт групповой звонок (у любого
@@ -83,6 +91,15 @@ export default function ChatsPage() {
   const [filter, setFilter] = useState<ChatFilter>("all");
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  // Контекстное меню чата (по долгому нажатию / правой кнопке).
+  const [ctxMenu, setCtxMenu] = useState<{
+    conv: Conversation;
+    x: number;
+    y: number;
+  } | null>(null);
+  const longPressRef = useRef(false);
+  const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [people, setPeople] = useState<FoundUser[]>([]);
   const [peopleLoading, setPeopleLoading] = useState(false);
   const [openingId, setOpeningId] = useState<string | null>(null);
@@ -119,14 +136,62 @@ export default function ChatsPage() {
     }
   };
 
+  const archivedCount = useMemo(
+    () => conversations.filter((c) => c.archived).length,
+    [conversations]
+  );
+
   const visible = useMemo(() => {
-    let list = [...conversations];
-    if (query.trim()) {
-      const q = query.toLowerCase();
+    const q = query.trim().toLowerCase();
+    // Во время поиска ищем по всем чатам (включая архив); иначе —
+    // только текущая вкладка (обычные или архивные).
+    let list = q
+      ? [...conversations]
+      : conversations.filter((c) => (showArchived ? c.archived : !c.archived));
+    if (q) {
       list = list.filter((c) => c.title.toLowerCase().includes(q));
     }
     return list;
+  }, [conversations, query, showArchived]);
+
+  // Глобальный поиск по тексту сообщений во всех чатах.
+  const messageMatches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [] as { conv: Conversation; msg: Message }[];
+    const out: { conv: Conversation; msg: Message }[] = [];
+    for (const c of conversations) {
+      for (let i = c.messages.length - 1; i >= 0; i--) {
+        const m = c.messages[i];
+        if (m.kind !== "text" || !m.text) continue;
+        if (m.text.toLowerCase().includes(q)) {
+          out.push({ conv: c, msg: m });
+          if (out.length >= 50) return out;
+        }
+      }
+    }
+    return out;
   }, [conversations, query]);
+
+  // ── долгое нажатие → контекстное меню чата ──
+  const openCtxMenu = (conv: Conversation, x: number, y: number) => {
+    const mx = Math.min(x, (typeof window !== "undefined" ? window.innerWidth : 360) - 220);
+    const my = Math.min(y, (typeof window !== "undefined" ? window.innerHeight : 640) - 180);
+    setCtxMenu({ conv, x: Math.max(8, mx), y: Math.max(8, my) });
+  };
+  const startLongPress = (conv: Conversation, x: number, y: number) => {
+    longPressRef.current = false;
+    if (lpTimer.current) clearTimeout(lpTimer.current);
+    lpTimer.current = setTimeout(() => {
+      longPressRef.current = true;
+      openCtxMenu(conv, x, y);
+    }, 450);
+  };
+  const cancelLongPress = () => {
+    if (lpTimer.current) {
+      clearTimeout(lpTimer.current);
+      lpTimer.current = null;
+    }
+  };
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-surface">
@@ -224,7 +289,34 @@ export default function ChatsPage() {
 
       {/* Список чатов */}
       <div className="no-scrollbar flex-1 overflow-y-auto border-t border-separator">
-        {!query.trim() && <StickerPromoBanner />}
+        {!query.trim() && !showArchived && <StickerPromoBanner />}
+        {/* Вход в архив (когда есть архивные чаты и нет поиска) */}
+        {!query.trim() && !showArchived && archivedCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowArchived(true)}
+            className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-2/70"
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-2 text-muted">
+              <Archive size={24} weight="fill" />
+            </span>
+            <span className="flex-1 text-[15px] font-semibold text-foreground">
+              Архив
+            </span>
+            <span className="text-[13px] text-muted">{archivedCount}</span>
+            <CaretRight size={16} weight="bold" className="text-muted-2" />
+          </button>
+        )}
+        {!query.trim() && showArchived && (
+          <button
+            type="button"
+            onClick={() => setShowArchived(false)}
+            className="flex w-full items-center gap-2 border-b border-separator px-4 py-3 text-left text-[15px] font-medium text-accent transition-colors hover:bg-surface-2/70"
+          >
+            <CaretRight size={16} weight="bold" className="rotate-180" />
+            Назад к чатам
+          </button>
+        )}
         {visible.map((conv, i) => {
             const preview = lastPreview(conv);
             const unread = countUnread(conv);
@@ -236,7 +328,23 @@ export default function ChatsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03, duration: 0.25 }}
                 whileTap={{ backgroundColor: "rgba(120,120,128,0.12)" }}
-                onClick={() => router.push(`/chats/${conv.id}`)}
+                onClick={() => {
+                  if (longPressRef.current) {
+                    longPressRef.current = false;
+                    return;
+                  }
+                  router.push(`/chats/${conv.id}`);
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  openCtxMenu(conv, e.clientX, e.clientY);
+                }}
+                onPointerDown={(e) =>
+                  startLongPress(conv, e.clientX, e.clientY)
+                }
+                onPointerUp={cancelLongPress}
+                onPointerLeave={cancelLongPress}
+                onPointerMove={cancelLongPress}
                 className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-2/70"
               >
                 <div className="relative">
@@ -312,6 +420,14 @@ export default function ChatsPage() {
             );
           })}
 
+        {query.trim() && messageMatches.length > 0 && (
+          <MessagesSection
+            matches={messageMatches}
+            query={query.trim()}
+            onOpen={(id) => router.push(`/chats/${id}`)}
+          />
+        )}
+
         {query.trim() && (
           <PeopleSection
             people={people}
@@ -327,9 +443,146 @@ export default function ChatsPage() {
         {visible.length === 0 &&
           query.trim() &&
           !peopleLoading &&
-          people.length === 0 && <EmptyChats hasQuery={true} />}
+          people.length === 0 &&
+          messageMatches.length === 0 && <EmptyChats hasQuery={true} />}
       </div>
+
+      {/* Контекстное меню чата */}
+      {ctxMenu && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setCtxMenu(null)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setCtxMenu(null);
+            }}
+          />
+          <div
+            className="fixed z-50 min-w-[210px] overflow-hidden rounded-2xl bg-surface py-1 shadow-xl ring-1 ring-separator"
+            style={ { top: ctxMenu.y, left: ctxMenu.x } }
+          >
+            <CtxItem
+              icon={ctxMenu.conv.archived ? ArchiveBox : Archive}
+              label={ctxMenu.conv.archived ? "Из архива" : "Архивировать"}
+              onClick={() => {
+                setArchived(ctxMenu.conv.id, !ctxMenu.conv.archived);
+                setCtxMenu(null);
+              }}
+            />
+            <CtxItem
+              icon={ctxMenu.conv.muted ? Bell : BellSlash}
+              label={ctxMenu.conv.muted ? "Включить звук" : "Без звука"}
+              onClick={() => {
+                setMuted(ctxMenu.conv.id, !ctxMenu.conv.muted);
+                setCtxMenu(null);
+              }}
+            />
+            <CtxItem
+              icon={Trash}
+              label="Удалить чат"
+              danger
+              onClick={() => {
+                deleteChat(ctxMenu.conv.id);
+                setCtxMenu(null);
+              }}
+            />
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+/** Пункт контекстного меню чата. */
+function CtxItem({
+  icon: Icon,
+  label,
+  onClick,
+  danger,
+}: {
+  icon: typeof Archive;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-2 active:bg-surface-2"
+    >
+      <Icon
+        size={20}
+        weight="regular"
+        className={danger ? "text-red-500" : "text-foreground"}
+      />
+      <span className={danger ? "text-[15px] text-red-500" : "text-[15px] text-foreground"}>
+        {label}
+      </span>
+    </button>
+  );
+}
+
+/** Секция результатов поиска по сообщениям. */
+function MessagesSection({
+  matches,
+  query,
+  onOpen,
+}: {
+  matches: { conv: Conversation; msg: Message }[];
+  query: string;
+  onOpen: (chatId: string) => void;
+}) {
+  return (
+    <div className="pb-4">
+      <p className="px-4 pb-1 pt-3 text-[13px] font-semibold uppercase tracking-wide text-muted-2">
+        Сообщения
+      </p>
+      {matches.map(({ conv, msg }) => (
+        <button
+          key={`${conv.id}:${msg.id}`}
+          type="button"
+          onClick={() => onOpen(conv.id)}
+          className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-2/70 active:bg-surface-2"
+        >
+          <Avatar
+            initials={conv.initials}
+            color={conv.color}
+            size={48}
+            src={conv.avatar || undefined}
+          />
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-1 text-[15px] font-semibold text-foreground">
+              <span className="truncate">{conv.title}</span>
+            </span>
+            <span className="block truncate text-[13px] text-muted">
+              {highlightSnippet(msg.text ?? "", query)}
+            </span>
+          </span>
+          <ChatText size={18} weight="regular" className="shrink-0 text-muted-2" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Обрезает текст вокруг найденного фрагмента и подсвечивает его. */
+function highlightSnippet(text: string, query: string) {
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx < 0) return text;
+  const start = Math.max(0, idx - 20);
+  const prefix = start > 0 ? "…" : "";
+  const before = text.slice(start, idx);
+  const match = text.slice(idx, idx + query.length);
+  const after = text.slice(idx + query.length);
+  return (
+    <>
+      {prefix}
+      {before}
+      <span className="font-semibold text-accent">{match}</span>
+      {after}
+    </>
   );
 }
 

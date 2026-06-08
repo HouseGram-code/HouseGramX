@@ -185,6 +185,7 @@ export function rowToConversation(
   return {
     id: r.id,
     kind: r.kind,
+    saved: r.id.startsWith("saved_") || undefined,
     title: r.title,
     color: r.color,
     initials: r.initials,
@@ -447,7 +448,7 @@ export function deleteChatRemote(id: string) {
 
 /**
  * Вставляет сообщение в БД. Возвращает true при успехе, false при ошибке —
- * чтобы стор мог снять статус «отправляется» или показать «не доставлено».
+ * чтобы стор мог снять статус «отправляется» или показать «не доставле��о».
  */
 export async function insertMessageRemote(
   chatId: string,
@@ -813,5 +814,73 @@ export function setBlockedRemote(chatId: string, uid: string, blocked: boolean) 
       .update({ blocked })
       .eq("chat_id", chatId)
       .eq("user_id", uid)
+  );
+}
+
+// ─── Запланированные сообщения (отложенная отправка) ────────────────────────
+
+export interface ScheduledRow {
+  id: string;
+  user_id: string;
+  chat_id: string;
+  text: string;
+  reply_to_id: string | null;
+  reply_to_text: string | null;
+  fire_at: string;
+  created_at: string;
+}
+
+/** Отложенное сообщение в доменном виде (fireAt — ms). */
+export interface RemoteScheduled {
+  id: string;
+  chatId: string;
+  text: string;
+  fireAt: number;
+}
+
+/** Загружает очередь отложенных сообщений текущего пользователя. */
+export async function loadScheduledRemote(
+  uid: string
+): Promise<RemoteScheduled[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data } = await getSupabase()
+    .from("scheduled_messages")
+    .select("*")
+    .eq("user_id", uid)
+    .order("fire_at", { ascending: true });
+  return ((data ?? []) as ScheduledRow[]).map((r) => ({
+    id: r.id,
+    chatId: r.chat_id,
+    text: r.text,
+    fireAt: new Date(r.fire_at).getTime(),
+  }));
+}
+
+/** Добавляет (или обновляет) отложенное сообщение. */
+export async function insertScheduledRemote(
+  uid: string,
+  sm: RemoteScheduled
+): Promise<void> {
+  if (!isSupabaseConfigured) return;
+  await run(
+    "insertScheduled",
+    getSupabase()
+      .from("scheduled_messages")
+      .upsert({
+        id: sm.id,
+        user_id: uid,
+        chat_id: sm.chatId,
+        text: sm.text,
+        fire_at: new Date(sm.fireAt).toISOString(),
+      })
+  );
+}
+
+/** Удаляет отложенное сообщение из очереди (после отправки или отмены). */
+export function deleteScheduledRemote(id: string) {
+  if (!isSupabaseConfigured) return;
+  run(
+    "deleteScheduled",
+    getSupabase().from("scheduled_messages").delete().eq("id", id)
   );
 }

@@ -29,6 +29,9 @@ import {
   markChatReadRemote,
   setBlockedRemote,
   rowToMessage,
+  loadScheduledRemote,
+  insertScheduledRemote,
+  deleteScheduledRemote,
   type MessageRow,
   type FoundUser,
 } from "./chat-remote";
@@ -171,6 +174,12 @@ export interface Conversation {
   peerBlockedMe?: boolean;
   /** Время последнего прочтения чата мной (ts). Для счётчика непрочитанных. */
   lastReadTs?: number;
+  /** Чат скрыт в архиве (локальная настройка устройства). */
+  archived?: boolean;
+  /** Таймер автоудаления сообщений в секундах (0/undefined — выключено). */
+  ttlSeconds?: number;
+  /** Особый чат «Избранное» (Saved Messages). Локальный, без облака. */
+  saved?: boolean;
   messages: Message[];
 }
 
@@ -255,6 +264,15 @@ export interface ActiveCall {
   speaker: boolean;
 }
 
+/** Запланированное (отложенное) сообщение. */
+export interface ScheduledMessage {
+  id: string;
+  chatId: string;
+  text: string;
+  /** Когда отправить (Date.now() ms). */
+  fireAt: number;
+}
+
 interface ChatContextValue {
   conversations: Conversation[];
   hydrated: boolean;
@@ -295,7 +313,7 @@ interface ChatContextValue {
   joinByLink: (code: string, kind: "channel" | "group") => string;
   /** Вступить в открытый канал/группу (кнопка «Присоединиться»). */
   joinChat: (chatId: string, displayName: string) => void;
-  /** Открыть/создать личный чат с найденным пользователем. Возвращает id. */
+  /** Открыть/создать личный чат с ��айденным пользователем. Возвращает id. */
   startDirectChat: (user: FoundUser) => Promise<string>;
   updateChannel: (chatId: string, patch: Partial<Conversation>) => void;
   addMembers: (chatId: string, ids: string[]) => void;
@@ -321,6 +339,16 @@ interface ChatContextValue {
   transferOwnership: (chatId: string, newOwnerId: string) => void;
   clearHistory: (chatId: string) => void;
   deleteChat: (chatId: string) => void;
+  /** Архивировать/разархивировать чат (локально для устройства). */
+  setArchived: (chatId: string, archived: boolean) => void;
+  /** Установить таймер исчезающих сообщений (секунды; 0 — выключить). */
+  setChatTtl: (chatId: string, ttlSeconds: number) => void;
+  /** Список запланированных сообщений (отложенная отправка). */
+  scheduled: ScheduledMessage[];
+  /** Запланировать отправку текста в чат на момент fireAt (ms). */
+  scheduleMessage: (chatId: string, text: string, fireAt: number) => void;
+  /** Отменить запланированное сообщение. */
+  cancelScheduled: (id: string) => void;
   // Групповой аудио-звонок
   activeCall: ActiveCall | null;
   startGroupCall: (chatId: string) => void;
@@ -369,14 +397,35 @@ const SEED_BOT: Conversation = {
   ],
 };
 
-function makeSeed(): ChatState {
+const SAVED_ID = "saved_messages";
+const SEED_SAVED: Conversation = {
+  id: SAVED_ID,
+  kind: "private",
+  saved: true,
+  title: "Избранное",
+  color: "linear-gradient(135deg,#2d9cff,#6c5ce7)",
+  initials: "🔖",
+  joined: true,
+  messages: [],
+};
+
+/** Гарантирует наличие чата «Избранное» в состоянии. */
+function ensureSaved(s: ChatState): ChatState {
+  if (s.conversations[SAVED_ID]) return s;
   return {
-    conversations: { test_bot: SEED_BOT },
-    order: ["test_bot"],
+    conversations: { [SAVED_ID]: SEED_SAVED, ...s.conversations },
+    order: [SAVED_ID, ...s.order.filter((x) => x !== SAVED_ID)],
   };
 }
 
-/** Создаёт персональный чат с тест-ботом (уникальный id на пользователя). */
+function makeSeed(): ChatState {
+  return {
+    conversations: { [SAVED_ID]: SEED_SAVED, test_bot: SEED_BOT },
+    order: [SAVED_ID, "test_bot"],
+  };
+}
+
+/** Создаёт персональный чат с тест-б��том (уникальный id на пользователя). */
 function makeBotSeed(id: string): Conversation {
   return {
     ...SEED_BOT,
@@ -399,6 +448,26 @@ function makeBotSeed(id: string): Conversation {
 /** ts последнего сообщения для сортировки списка чатов. */
 function lastTs(c: Conversation): number {
   return c.messages.length ? c.messages[c.messages.length - 1].ts : 0;
+}
+
+/** Предопределённые таймеры исчезающих сообщений (секунды). */
+export const TTL_OPTIONS: { value: number; label: string }[] = [
+  { value: 0, label: "Выключено" },
+  { value: 30, label: "30 секунд" },
+  { value: 300, label: "5 минут" },
+  { value: 3600, label: "1 час" },
+  { value: 86400, label: "1 день" },
+  { value: 604800, label: "1 неделя" },
+];
+
+/** Человекочитаемый таймер автоудаления. */
+export function formatTtl(seconds: number): string {
+  const opt = TTL_OPTIONS.find((o) => o.value === seconds);
+  if (opt) return opt.label.toLowerCase();
+  if (seconds % 86400 === 0) return `${seconds / 86400} дн.`;
+  if (seconds % 3600 === 0) return `${seconds / 3600} ч.`;
+  if (seconds % 60 === 0) return `${seconds / 60} мин.`;
+  return `${seconds} сек.`;
 }
 
 /** Читает настройки уведомлений из кэша (декаплинг от SettingsProvider). */
@@ -490,6 +559,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<ChatState>(makeSeed);
   const [hydrated, setHydrated] = useState(false);
   const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
+  const [scheduled, setScheduled] = useState<ScheduledMessage[]>([]);
+  const scheduledRef = useRef<ScheduledMessage[]>([]);
+  const sendTextRef = useRef<ChatContextValue["sendText"] | null>(null);
   const timers = useRef<number[]>([]);
 
   // Синхронный доступ к актуальному состоянию для realtime/remote-операций.
@@ -505,7 +577,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     // 1. Мгновенно показываем кэш (или сид).
     const cached = readCache<ChatState>(CACHE_KEY);
-    if (cached?.conversations && cached.order) setState(cached);
+    if (cached?.conversations && cached.order) setState(ensureSaved(cached));
     setHydrated(true);
 
     // Без Supabase работаем как локальное демо (на одном устройстве).
@@ -530,6 +602,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         const bot = makeBotSeed(botId);
         createChatRemote(bot, userId);
         remote = [bot, ...remote];
+      }
+      // Гарантируем наличие реального чата «Избранное» (самочат в облаке).
+      if (!remote.some((c) => c.saved)) {
+        const savedConv: Conversation = {
+          id: `saved_${userId.slice(0, 8)}`,
+          kind: "private",
+          saved: true,
+          title: "Избранное",
+          color: "linear-gradient(135deg,#2d9cff,#6c5ce7)",
+          initials: "🔖",
+          joined: true,
+          isOwner: true,
+          messages: [],
+        };
+        createChatRemote(savedConv, userId);
+        remote = [savedConv, ...remote];
       }
       setState((prev) => {
         const conversations: Record<string, Conversation> = {};
@@ -765,6 +853,85 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     writeCache(STORAGE_KEY, state);
   }, [state, hydrated]);
 
+  // Исчезающие сообщения: периодически удаляем устаревшие сообщения
+  // в чатах с включённым таймером. Системные сообщения сохраняются.
+  useEffect(() => {
+    const prune = () => {
+      setState((s) => {
+        let changed = false;
+        const conversations = { ...s.conversations };
+        const now = Date.now();
+        for (const id of Object.keys(conversations)) {
+          const c = conversations[id];
+          if (!c.ttlSeconds) continue;
+          const cutoff = now - c.ttlSeconds * 1000;
+          const kept = c.messages.filter(
+            (m) => m.kind === "system" || m.ts >= cutoff
+          );
+          if (kept.length !== c.messages.length) {
+            conversations[id] = { ...c, messages: kept };
+            changed = true;
+          }
+        }
+        return changed ? { ...s, conversations } : s;
+      });
+    };
+    const iv = window.setInterval(prune, 15000);
+    prune();
+    return () => window.clearInterval(iv);
+  }, []);
+
+  // Запланированные сообщения: гидрация, сохранение и отправка по времени.
+  useEffect(() => {
+    scheduledRef.current = scheduled;
+  });
+  // Очередь отложенных сообщений хранится в Supabase (scheduled_messages)
+  // и синхронизируется между устройствами через realtime. Локально не кэшируем.
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let active = true;
+    const load = async (uid: string | null) => {
+      if (!uid) {
+        if (active) setScheduled([]);
+        return;
+      }
+      const list = await loadScheduledRemote(uid);
+      if (active) setScheduled(list);
+    };
+    void load(getSyncUser());
+    const off = onSyncUserChange((id) => void load(id));
+    const sb = getSupabase();
+    const ch = sb
+      .channel("scheduled-stream")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "scheduled_messages" },
+        () => void load(getSyncUser())
+      )
+      .subscribe();
+    return () => {
+      active = false;
+      off();
+      sb.removeChannel(ch);
+    };
+  }, []);
+  useEffect(() => {
+    const tick = () => {
+      const now = Date.now();
+      const due = scheduledRef.current.filter((s) => s.fireAt <= now);
+      if (due.length === 0) return;
+      const send = sendTextRef.current;
+      for (const s of due) {
+        if (send) send(s.chatId, s.text);
+        deleteScheduledRemote(s.id);
+      }
+      setScheduled((list) => list.filter((s) => s.fireAt > Date.now()));
+    };
+    const iv = window.setInterval(tick, 5000);
+    tick();
+    return () => window.clearInterval(iv);
+  }, []);
+
   // Очистка отложенных таймеров (ответы бота) при размонтировании.
   useEffect(() => {
     const list = timers.current;
@@ -878,7 +1045,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const scheduleBotReply = (chatId: string, userText: string) => {
     const willSticker = userText.trim().toLowerCase() === "/sticker";
-    // Сначала показываем активность «печатает...» / «выбирает стикер...»
+    // Сначала показы����аем активность «печатает...» / «выбирает стикер...»
     const setActivity = (activity: Activity) => {
       setState((s) => {
         const conv = s.conversations[chatId];
@@ -928,6 +1095,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     ]);
     if (conv?.kind === "bot") scheduleBotReply(chatId, trimmed);
   };
+
+  // Держим актуальную ссылку на sendText для планировщика.
+  useEffect(() => {
+    sendTextRef.current = sendText;
+  });
 
   const sendSticker: ChatContextValue["sendSticker"] = (
     chatId,
@@ -1169,6 +1341,44 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }));
   };
 
+  const setArchived: ChatContextValue["setArchived"] = (chatId, archived) => {
+    // Архив — локальное состояние устройства, в облако не зеркалится.
+    update(chatId, (c) => ({ ...c, archived }));
+  };
+
+  const setChatTtl: ChatContextValue["setChatTtl"] = (chatId, ttlSeconds) => {
+    const next = ttlSeconds > 0 ? ttlSeconds : undefined;
+    update(chatId, (c) => ({ ...c, ttlSeconds: next }));
+    appendMessages(chatId, [
+      {
+        author: "them",
+        kind: "system",
+        text: next
+          ? `Исчезающие сообщения включены · ${formatTtl(next)}`
+          : "Исчезающие сообщения выключены",
+        reaction: null,
+      },
+    ]);
+  };
+
+  const scheduleMessage: ChatContextValue["scheduleMessage"] = (
+    chatId,
+    text,
+    fireAt
+  ) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const item = { id: uid(), chatId, text: trimmed, fireAt };
+    setScheduled((list) => [...list, item]);
+    const userId = me();
+    if (userId) void insertScheduledRemote(userId, item);
+  };
+
+  const cancelScheduled: ChatContextValue["cancelScheduled"] = (id) => {
+    setScheduled((list) => list.filter((s) => s.id !== id));
+    deleteScheduledRemote(id);
+  };
+
   const forwardMessage: ChatContextValue["forwardMessage"] = (
     fromChatId,
     messageId,
@@ -1392,7 +1602,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     const id = `${kind === "channel" ? "ch" : "gr"}_join_${code}`;
 
-    const title = kind === "channel" ? "Канал" : "Группа";
+    const title = kind === "channel" ? "Канал" : "��руппа";
     setState((s) => {
       // Уже открыт этот превью-чат
       if (s.conversations[id]) {
@@ -1739,6 +1949,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         transferOwnership,
         clearHistory,
         deleteChat,
+        setArchived,
+        setChatTtl,
+        scheduled,
+        scheduleMessage,
+        cancelScheduled,
         activeCall,
         startGroupCall,
         joinGroupCall,

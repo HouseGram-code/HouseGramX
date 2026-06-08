@@ -17,6 +17,8 @@ import {
   Check,
   MagnifyingGlass,
   ClockCounterClockwise,
+  Timer,
+  Clock,
   Info,
   Paperclip,
   Microphone,
@@ -42,7 +44,13 @@ import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { AttachSheet } from "@/components/AttachSheet";
 import { PopoverMenu } from "@/components/PopoverMenu";
 import { ActivityText, TypingBubble } from "@/components/TypingIndicator";
-import { useChats, canAdminDo, type Message } from "@/lib/chat-store";
+import {
+  useChats,
+  canAdminDo,
+  TTL_OPTIONS,
+  formatTtl,
+  type Message,
+} from "@/lib/chat-store";
 import { loadUserProfile, type UserProfile } from "@/lib/chat-remote";
 import { useGroupCall, useCallWatch } from "@/lib/group-call";
 import { useChatTyping } from "@/lib/typing";
@@ -92,6 +100,10 @@ export default function ChatPage({
     updateChannel,
     joinChat,
     clearHistory,
+    setChatTtl,
+    scheduleMessage,
+    scheduled,
+    cancelScheduled,
   } = useChats();
   const { useSticker, useEmoji, findSetBySticker } = useStickers();
   const { show } = useToast();
@@ -116,6 +128,9 @@ export default function ChatPage({
     if (searchParams.get("search") === "1") setSearchOpen(true);
   }, [searchParams]);
   const [confirm, setConfirm] = useState<import("@/components/ConfirmSheet").ConfirmConfig | null>(null);
+  const [ttlPickerOpen, setTtlPickerOpen] = useState(false);
+  const [schedulePickerOpen, setSchedulePickerOpen] = useState(false);
+  const [scheduleAt, setScheduleAt] = useState("");
   // Режимы композитора
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
@@ -254,6 +269,8 @@ export default function ChatPage({
   const focusInput = () =>
     requestAnimationFrame(() => textareaRef.current?.focus());
 
+  const chatScheduled = scheduled.filter((x) => x.chatId === conv.id);
+
   const handleSend = () => {
     if (!draft.trim()) return;
     if (editing) {
@@ -267,6 +284,21 @@ export default function ChatPage({
     typing.stopTyping();
     setDraft("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
+  };
+
+  const handleSchedule = () => {
+    if (!draft.trim()) return;
+    const t = new Date(scheduleAt).getTime();
+    if (!scheduleAt || isNaN(t) || t <= Date.now()) {
+      show("Выберите время в будущем");
+      return;
+    }
+    scheduleMessage(conv.id, draft, t);
+    setReplyTo(null);
+    setDraft("");
+    setSchedulePickerOpen(false);
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+    show("Сообщение запланировано");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -594,11 +626,16 @@ export default function ChatPage({
                 open={headerMenu}
                 onClose={() => setHeaderMenu(false)}
                 items={[
-                  {
-                    label: "Информация",
-                    icon: Info,
-                    onClick: () => router.push(`/chats/${conv.id}/info`),
-                  },
+                  ...(conv.saved
+                    ? []
+                    : [
+                        {
+                          label: "Информация",
+                          icon: Info,
+                          onClick: () =>
+                            router.push(`/chats/${conv.id}/info`),
+                        },
+                      ]),
                   {
                     label: "Поиск",
                     icon: MagnifyingGlass,
@@ -608,18 +645,32 @@ export default function ChatPage({
                     },
                   },
                   {
-                    label: iBlockedPeer ? "Разблокировать" : "Заблокировать",
-                    icon: Prohibit,
-                    danger: !iBlockedPeer,
+                    label: "Исчезающие сообщения",
+                    icon: Timer,
                     onClick: () => {
-                      toggleBlock(conv.id);
-                      show(
-                        iBlockedPeer
-                          ? "Пользователь разблокирован"
-                          : "Пользователь заблокирован"
-                      );
+                      setHeaderMenu(false);
+                      setTtlPickerOpen(true);
                     },
                   },
+                  ...(conv.saved
+                    ? []
+                    : [
+                        {
+                          label: iBlockedPeer
+                            ? "Разблокировать"
+                            : "Заблокировать",
+                          icon: Prohibit,
+                          danger: !iBlockedPeer,
+                          onClick: () => {
+                            toggleBlock(conv.id);
+                            show(
+                              iBlockedPeer
+                                ? "Пользователь разблокирован"
+                                : "Пользователь заблокирован"
+                            );
+                          },
+                        },
+                      ]),
                 ]}
               />
             )}
@@ -639,6 +690,14 @@ export default function ChatPage({
                     onClick: () => {
                       setHeaderMenu(false);
                       setSearchOpen(true);
+                    },
+                  },
+                  {
+                    label: "Исчезающие сообщения",
+                    icon: Timer,
+                    onClick: () => {
+                      setHeaderMenu(false);
+                      setTtlPickerOpen(true);
                     },
                   },
                   // Очистить историю — только владельцу/админу
@@ -820,7 +879,7 @@ export default function ChatPage({
               )}
               <p className="mt-2 text-[13px] text-muted">
                 {isGroup
-                  ? "Присоединитесь, чтобы участвовать в обсуждении"
+                  ? "Присоединитесь, чтобы участв��вать в обсуждении"
                   : "Подпишитесь, чтобы читать публикации"}
               </p>
             </motion.div>
@@ -1281,6 +1340,31 @@ export default function ChatPage({
                 )}
               </div>
 
+              {!editing && (draft.trim() || chatScheduled.length > 0) && (
+                <button
+                  type="button"
+                  aria-label="Отложенная отправка"
+                  onClick={() => {
+                    const d = new Date(Date.now() + 60 * 60 * 1000);
+                    const pad = (n: number) => String(n).padStart(2, "0");
+                    setScheduleAt(
+                      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
+                        d.getDate()
+                      )}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+                    );
+                    setSchedulePickerOpen(true);
+                  }}
+                  className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted transition active:scale-90 hover:bg-surface-2"
+                >
+                  <Clock size={23} weight="regular" />
+                  {chatScheduled.length > 0 && (
+                    <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-white">
+                      {chatScheduled.length}
+                    </span>
+                  )}
+                </button>
+              )}
+
               {draft.trim() || editing ? (
                 <motion.button
                   type="button"
@@ -1368,6 +1452,120 @@ export default function ChatPage({
       />
 
       {/* Подтверждение действий из меню (очистка истории и т.п.) */}
+      {schedulePickerOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40"
+          onClick={() => setSchedulePickerOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-3xl bg-surface p-4 pb-[max(env(safe-area-inset-bottom),1rem)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="pb-2 text-center text-[15px] font-semibold text-foreground">
+              Отложенная отправка
+            </p>
+            {chatScheduled.length > 0 && (
+              <div className="mb-3 max-h-48 overflow-y-auto rounded-2xl bg-surface-2/60">
+                {chatScheduled
+                  .slice()
+                  .sort((a, b) => a.fireAt - b.fireAt)
+                  .map((sm) => (
+                    <div
+                      key={sm.id}
+                      className="flex items-center gap-2 px-3 py-2"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[14px] text-foreground">
+                          {sm.text}
+                        </span>
+                        <span className="block text-[12px] text-muted">
+                          {new Date(sm.fireAt).toLocaleString("ru-RU", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="Отменить"
+                        onClick={() => cancelScheduled(sm.id)}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-red-500 transition hover:bg-surface-2 active:scale-90"
+                      >
+                        <X size={18} weight="bold" />
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            )}
+            {draft.trim() ? (
+              <>
+                <label className="mb-1 block text-[13px] text-muted">
+                  Когда отправить
+                </label>
+                <input
+                  type="datetime-local"
+                  value={scheduleAt}
+                  onChange={(e) => setScheduleAt(e.target.value)}
+                  className="mb-3 w-full rounded-2xl bg-surface-2 px-3 py-2.5 text-[15px] text-foreground focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleSchedule}
+                  className="w-full rounded-2xl bg-accent py-3 text-[15px] font-semibold text-white transition active:scale-95"
+                >
+                  Запланировать
+                </button>
+              </>
+            ) : (
+              <p className="py-2 text-center text-[13px] text-muted">
+                Введите текст сообщения, чтобы запланировать отправку
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+      {ttlPickerOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40"
+          onClick={() => setTtlPickerOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-3xl bg-surface p-2 pb-[max(env(safe-area-inset-bottom),1rem)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="px-4 pt-3 text-center text-[15px] font-semibold text-foreground">
+              Исчезающие сообщения
+            </p>
+            <p className="px-4 pb-2 pt-1 text-center text-[13px] text-muted">
+              Новые сообщения в этом чате будут автоматически удаляться через выбранное время
+            </p>
+            {TTL_OPTIONS.map((opt) => {
+              const active = (conv.ttlSeconds ?? 0) === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    setChatTtl(conv.id, opt.value);
+                    setTtlPickerOpen(false);
+                    show(
+                      opt.value === 0
+                        ? "Таймер отключён"
+                        : `Таймер: ${formatTtl(opt.value)}`
+                    );
+                  }}
+                  className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-[15px] text-foreground transition-colors hover:bg-surface-2 active:bg-surface-2"
+                >
+                  <span>{opt.label}</span>
+                  {active && <span className="text-accent">✓</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <ConfirmSheet config={confirm} onClose={() => setConfirm(null)} />
     </div>
   );
