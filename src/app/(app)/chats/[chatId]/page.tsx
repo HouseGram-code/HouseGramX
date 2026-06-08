@@ -49,11 +49,11 @@ import { useChatTyping } from "@/lib/typing";
 import { useSettings } from "@/lib/settings-store";
 import { useStickers, type StickerSet } from "@/lib/stickers-store";
 import { useProfile } from "@/lib/profile-store";
-import { usePresence } from "@/lib/presence-store";
+import { usePresence, useLastSeen } from "@/lib/presence-store";
 import { setActiveChat } from "@/lib/notify";
 import { useRecorder } from "@/lib/use-recorder";
 import { useToast } from "@/components/Toast";
-import { formatLastSeen, fallbackLastSeen } from "@/lib/utils";
+import { formatLastSeen } from "@/lib/utils";
 
 const CHANNEL_REACTIONS = ["👍", "❤️", "😂", "🔥", "😢", "😍", "👌"];
 
@@ -130,6 +130,7 @@ export default function ChatPage({
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
 
   const conv = getConversation(chatId);
+  const peerLastSeen = useLastSeen(conv?.peerId);
 
   // Запись голоса/видео-кружка. По завершении — отправляем как вложение.
   const recorder = useRecorder((file) => {
@@ -541,10 +542,7 @@ export default function ChatPage({
                 ) : (
                   <span className="text-muted">
                     {s.lastSeenVisibility === "everyone"
-                      ? formatLastSeen(
-                          conv.lastSeen ??
-                            fallbackLastSeen(conv.peerId ?? conv.id),
-                        )
+                      ? formatLastSeen(peerLastSeen ?? conv.lastSeen)
                       : "был(а) недавно"}
                   </span>
                 )}

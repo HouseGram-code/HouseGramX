@@ -52,18 +52,3 @@ export function formatLastSeen(ts?: number): string {
   });
   return `был(а) в сети ${date}`;
 }
-
-/**
- * Детерминированное «правдоподобное» время последнего визита для случаев,
- * когда у собеседника ещё нет реального last_seen. Стабильно для
- * одного собеседника и даёт фразу вида «был(а) в сети N мин назад».
- */
-export function fallbackLastSeen(seed?: string): number {
-  const str = seed && seed.length > 0 ? seed : "anon";
-  let h = 0;
-  for (let i = 0; i < str.length; i++) {
-    h = (h * 31 + str.charCodeAt(i)) >>> 0;
-  }
-  const minutes = 3 + (h % 55); // 3..57 минут назад
-  return Date.now() - minutes * 60_000;
-}

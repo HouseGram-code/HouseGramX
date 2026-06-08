@@ -106,11 +106,17 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
       const uid = getSyncUser();
       if (uid && document.visibilityState === "hidden") touchLastSeen(uid);
     };
+    const onPageHide = () => {
+      const uid = getSyncUser();
+      if (uid) touchLastSeen(uid);
+    };
     document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onPageHide);
 
     return () => {
       off();
       document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onPageHide);
       disconnect();
     };
   }, []);
@@ -129,4 +135,45 @@ export function usePresence() {
   const ctx = useContext(PresenceContext);
   if (!ctx) throw new Error("usePresence должен быть внутри PresenceProvider");
   return ctx;
+}
+
+/**
+ * Возвращает реальное время последнего визита пользователя из Supabase
+ * (колонка profiles.last_seen в миллисекундах), без фейковых значений.
+ * Значение обновляется при смене онлайн-статуса (например, когда собеседник
+ * вышел из сети) и периодически раз в минуту, пока открыт экран.
+ */
+export function useLastSeen(
+  userId: string | null | undefined,
+): number | undefined {
+  const { onlineIds } = usePresence();
+  const [ts, setTs] = useState<number | undefined>(undefined);
+  const online = !!userId && onlineIds.has(userId);
+
+  useEffect(() => {
+    if (!userId || !isSupabaseConfigured) {
+      setTs(undefined);
+      return;
+    }
+    let cancelled = false;
+    const fetchLastSeen = async () => {
+      const { data } = await getSupabase()
+        .from("profiles")
+        .select("last_seen")
+        .eq("id", userId)
+        .maybeSingle();
+      if (cancelled) return;
+      const v = (data as { last_seen?: string } | null)?.last_seen;
+      setTs(v ? new Date(v).getTime() : undefined);
+    };
+    void fetchLastSeen();
+    // Обновляем раз в минуту, чтобы «был N мин назад» оставалось актуальным.
+    const iv = setInterval(fetchLastSeen, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+    };
+  }, [userId, online]);
+
+  return ts;
 }

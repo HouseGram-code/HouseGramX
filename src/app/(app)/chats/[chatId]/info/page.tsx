@@ -26,12 +26,12 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { BugHunterBadge } from "@/components/BugHunterBadge";
 import { badgeMeta } from "@/lib/badges";
 import { useChats } from "@/lib/chat-store";
-import { usePresence } from "@/lib/presence-store";
+import { usePresence, useLastSeen } from "@/lib/presence-store";
 import { loadUserProfile, type UserProfile } from "@/lib/chat-remote";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/lib/auth-store";
 import { useSettings } from "@/lib/settings-store";
-import { formatLastSeen, fallbackLastSeen } from "@/lib/utils";
+import { formatLastSeen } from "@/lib/utils";
 
 function subsLabel(n: number) {
   const m10 = n % 10;
@@ -70,6 +70,8 @@ export default function ChatInfoPage({
       active = false;
     };
   }, [conv?.kind, conv?.peerId]);
+
+  const liveLastSeen = useLastSeen(conv?.peerId);
 
   if (!conv) {
     return (
@@ -115,11 +117,7 @@ export default function ChatInfoPage({
         : online
           ? "в сети"
           : s.lastSeenVisibility === "everyone"
-            ? formatLastSeen(
-                peer?.lastSeen ??
-                  conv.lastSeen ??
-                  fallbackLastSeen(conv.peerId ?? conv.id),
-              )
+            ? formatLastSeen(liveLastSeen ?? peer?.lastSeen ?? conv.lastSeen)
             : "был(а) недавно";
 
   return (
