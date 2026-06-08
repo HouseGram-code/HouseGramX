@@ -108,6 +108,17 @@ export default function ChatInfoPage({
       ? conv.online || isOnline(conv.peerId)
       : isBot;
 
+  // Реальная активность собеседника — время его последнего сообщения в чате.
+  // Используется как fallback, если в базе ещё нет last_seen.
+  let lastPeerMsgTs: number | undefined;
+  for (let i = conv.messages.length - 1; i >= 0; i--) {
+    const m = conv.messages[i];
+    if (m.author === "them" && m.kind !== "system") {
+      lastPeerMsgTs = m.ts;
+      break;
+    }
+  }
+
   const statusText = isChannel
     ? subsLabel(subs)
     : isBot
@@ -117,7 +128,9 @@ export default function ChatInfoPage({
         : online
           ? "в сети"
           : s.lastSeenVisibility === "everyone"
-            ? formatLastSeen(liveLastSeen ?? peer?.lastSeen ?? conv.lastSeen)
+            ? formatLastSeen(
+                liveLastSeen ?? peer?.lastSeen ?? conv.lastSeen ?? lastPeerMsgTs,
+              )
             : "был(а) недавно";
 
   return (
