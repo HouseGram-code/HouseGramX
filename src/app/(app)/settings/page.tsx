@@ -24,11 +24,24 @@ import { useAuth } from "@/lib/auth-store";
 import { isAdminEmail } from "@/lib/admin";
 import { useState } from "react";
 import { SignOut, ShieldStar } from "@phosphor-icons/react";
+import {
+  FolderSimple,
+  ShieldCheck,
+  Translate,
+  Database,
+} from "@phosphor-icons/react";
 
 const themeLabel: Record<string, string> = {
   system: "Как в системе",
   light: "Светлая",
   dark: "Тёмная",
+};
+
+const languageLabel: Record<string, string> = {
+  ru: "Русский",
+  en: "English",
+  uk: "Українська",
+  kk: "Қазақша",
 };
 
 export default function SettingsPage() {
@@ -149,11 +162,36 @@ export default function SettingsPage() {
             onClick={() => router.push("/settings/favorites")}
           />
           <NavRow
+            icon={FolderSimple}
+            label="Папки"
+            index={6}
+            onClick={() => router.push("/settings/folders")}
+          />
+          <NavRow
+            icon={ShieldCheck}
+            label="Конфиденциальность"
+            index={7}
+            onClick={() => router.push("/settings/privacy")}
+          />
+          <NavRow
+            icon={Translate}
+            label="Язык"
+            value={languageLabel[s.language]}
+            index={8}
+            onClick={() => router.push("/settings/language")}
+          />
+          <NavRow
+            icon={Database}
+            label="Данные и память"
+            index={9}
+            onClick={() => router.push("/settings/data")}
+          />
+          <NavRow
             icon={Info}
             label="О приложении"
             value={`${"0.1.0"} beta`}
             last
-            index={6}
+            index={10}
             onClick={() => router.push("/settings/about")}
           />
         </Group>

@@ -14,8 +14,12 @@ export type Theme = "light" | "dark" | "system";
 /** Кто видит время моей активности (последний визит). */
 export type LastSeenVisibility = "everyone" | "contacts" | "nobody";
 
+/** Язык интерфейса. */
+export type Language = "ru" | "en" | "uk" | "kk";
+
 export interface SettingsState {
   theme: Theme;
+  language: Language;
   // Уведомления
   notificationsEnabled: boolean;
   sound: boolean;
@@ -44,6 +48,7 @@ export interface SettingsState {
 
 const DEFAULTS: SettingsState = {
   theme: "system",
+  language: "ru",
   notificationsEnabled: true,
   sound: true,
   vibration: true,

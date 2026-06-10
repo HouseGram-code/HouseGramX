@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   MagnifyingGlass,
   At,
@@ -19,11 +19,17 @@ import {
   Trash,
   CaretRight,
   ChatText,
+  PushPin,
+  PushPinSlash,
+  X,
+  Checks,
+  Check,
 } from "@phosphor-icons/react";
 import { Avatar } from "@/components/Avatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { useAuth } from "@/lib/auth-store";
 import { PopoverMenu } from "@/components/PopoverMenu";
+import { ConfirmSheet, type ConfirmConfig } from "@/components/ConfirmSheet";
 import { useChats, type Conversation, type Message } from "@/lib/chat-store";
 import { useActiveCallChats } from "@/lib/group-call";
 import { countUnread, searchUsers, type FoundUser } from "@/lib/chat-remote";
@@ -32,11 +38,12 @@ import { ConnectionTitle } from "@/components/ConnectionTitle";
 import { cn } from "@/lib/utils";
 import { StickerPromoBanner } from "@/components/StickerPromoBanner";
 
-type ChatFilter = "all" | "new";
+type ChatFilter = "all" | "new" | "channels";
 
 const filters: { key: ChatFilter; label: string }[] = [
   { key: "all", label: "Все" },
   { key: "new", label: "Новые" },
+  { key: "channels", label: "Каналы" },
 ];
 
 function lastPreview(conv: Conversation) {
@@ -76,8 +83,16 @@ function lastPreview(conv: Conversation) {
 
 export default function ChatsPage() {
   const router = useRouter();
-  const { conversations, activeCall, startDirectChat, setArchived, setMuted, deleteChat } =
-    useChats();
+  const {
+    conversations,
+    activeCall,
+    startDirectChat,
+    setArchived,
+    setMuted,
+    setPinned,
+    markChatRead,
+    deleteChat,
+  } = useChats();
   const { isOnline } = usePresence();
   const { user } = useAuth();
   // Чаты, в которых прямо сейчас идёт групповой звонок (у любого
@@ -91,13 +106,17 @@ export default function ChatsPage() {
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
-  // Контекстное меню чата (по долгому нажатию / правой кнопке).
+  const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
+  // Режим множественного выбора чатов (как в Telegram/MAX).
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Контекстное меню чата (по правому клику на десктопе).
   const [ctxMenu, setCtxMenu] = useState<{
     conv: Conversation;
     x: number;
     y: number;
   } | null>(null);
-  const longPressRef = useRef(false);
+  const longPressFired = useRef(false);
   const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [people, setPeople] = useState<FoundUser[]>([]);
   const [peopleLoading, setPeopleLoading] = useState(false);
@@ -149,9 +168,26 @@ export default function ChatsPage() {
       : conversations.filter((c) => (showArchived ? c.archived : !c.archived));
     if (q) {
       list = list.filter((c) => c.title.toLowerCase().includes(q));
+    } else {
+      // Вкладки-фильтры (работают только вне поиска и архива).
+      if (filter === "new") {
+        list = list.filter((c) => countUnread(c) > 0);
+      } else if (filter === "channels") {
+        list = list.filter((c) => c.kind === "channel");
+      }
+    }
+    // Закреплённые чаты — всегда вверху (стабильная сортировка по pinnedAt).
+    if (!q) {
+      list = [...list].sort((a, b) => {
+        const ap = a.pinned ? 1 : 0;
+        const bp = b.pinned ? 1 : 0;
+        if (ap !== bp) return bp - ap;
+        if (ap && bp) return (a.pinnedAt ?? 0) - (b.pinnedAt ?? 0);
+        return 0;
+      });
     }
     return list;
-  }, [conversations, query, showArchived]);
+  }, [conversations, query, showArchived, filter]);
 
   // Глобальный поиск по тексту сообщений во всех чатах.
   const messageMatches = useMemo(() => {
@@ -171,19 +207,101 @@ export default function ChatsPage() {
     return out;
   }, [conversations, query]);
 
-  // ── долгое нажатие → контекстное меню чата ──
+  // ── Множественный выбор ──
+  const selectedConvs = useMemo(
+    () => visible.filter((c) => selected.has(c.id)),
+    [visible, selected]
+  );
+  const enterSelect = (id: string) => {
+    setSelectMode(true);
+    setSelected(new Set([id]));
+    setCtxMenu(null);
+  };
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      if (next.size === 0) setSelectMode(false);
+      return next;
+    });
+  };
+  const exitSelect = () => {
+    setSelectMode(false);
+    setSelected(new Set());
+  };
+  const allVisibleSelected =
+    visible.length > 0 && visible.every((c) => selected.has(c.id));
+  const toggleSelectAll = () => {
+    if (allVisibleSelected) {
+      exitSelect();
+    } else {
+      setSelected(new Set(visible.map((c) => c.id)));
+    }
+  };
+
+  // Производные состояния для нижней панели действий.
+  const allMuted =
+    selectedConvs.length > 0 && selectedConvs.every((c) => c.muted);
+  const allPinned =
+    selectedConvs.length > 0 && selectedConvs.every((c) => c.pinned);
+  const allArchived =
+    selectedConvs.length > 0 && selectedConvs.every((c) => c.archived);
+
+  const doRead = () => {
+    selectedConvs.forEach((c) => markChatRead(c.id));
+    exitSelect();
+  };
+  const doPin = () => {
+    const target = !allPinned;
+    selectedConvs.forEach((c) => setPinned(c.id, target));
+    exitSelect();
+  };
+  const doMute = () => {
+    const target = !allMuted;
+    selectedConvs.forEach((c) => setMuted(c.id, target));
+    exitSelect();
+  };
+  const doArchive = () => {
+    const target = !allArchived;
+    selectedConvs.forEach((c) => setArchived(c.id, target));
+    exitSelect();
+  };
+  const doDelete = () => {
+    const count = selectedConvs.length;
+    setConfirm({
+      title: count === 1 ? "Удалить чат?" : `Удалить чаты (${count})?`,
+      message: "Это действие нельзя отменить.",
+      confirmLabel: "Удалить",
+      danger: true,
+      onConfirm: () => {
+        selectedConvs.forEach((c) => deleteChat(c.id));
+        exitSelect();
+      },
+    });
+  };
+
+  // ── Контекстное меню (правый клик на десктопе) ──
   const openCtxMenu = (conv: Conversation, x: number, y: number) => {
     const mx = Math.min(x, (typeof window !== "undefined" ? window.innerWidth : 360) - 220);
-    const my = Math.min(y, (typeof window !== "undefined" ? window.innerHeight : 640) - 180);
+    const my = Math.min(y, (typeof window !== "undefined" ? window.innerHeight : 640) - 220);
     setCtxMenu({ conv, x: Math.max(8, mx), y: Math.max(8, my) });
   };
-  const startLongPress = (conv: Conversation, x: number, y: number) => {
-    longPressRef.current = false;
+
+  // ── Долгое нажатие → режим выбора ──
+  const startLongPress = (conv: Conversation) => {
+    longPressFired.current = false;
     if (lpTimer.current) clearTimeout(lpTimer.current);
     lpTimer.current = setTimeout(() => {
-      longPressRef.current = true;
-      openCtxMenu(conv, x, y);
-    }, 450);
+      longPressFired.current = true;
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        try {
+          navigator.vibrate?.(15);
+        } catch {}
+      }
+      if (selectMode) toggleSelect(conv.id);
+      else enterSelect(conv.id);
+    }, 400);
   };
   const cancelLongPress = () => {
     if (lpTimer.current) {
@@ -192,105 +310,147 @@ export default function ChatsPage() {
     }
   };
 
+  const onRowClick = (conv: Conversation) => {
+    if (longPressFired.current) {
+      longPressFired.current = false;
+      return;
+    }
+    if (selectMode) {
+      toggleSelect(conv.id);
+      return;
+    }
+    router.push(`/chats/${conv.id}`);
+  };
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-surface">
-      {/* Шапка */}
+      {/* ��апка */}
       <header className="z-10 bg-surface px-4 pt-[max(env(safe-area-inset-top),1rem)] pb-2">
-        <div className="flex items-center justify-between">
-          <ConnectionTitle />
-          <div className="flex items-center gap-2">
+        {selectMode ? (
+          // ── Шапка режима выбора ──
+          <div className="flex h-9 items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                aria-label="Отменить выбор"
+                onClick={exitSelect}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-foreground transition active:scale-90"
+              >
+                <X size={22} weight="bold" />
+              </button>
+              <span className="text-[17px] font-semibold text-foreground">
+                {selected.size}
+              </span>
+            </div>
             <button
               type="button"
-              aria-label="Поиск"
-              onClick={() => searchRef.current?.focus()}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-muted transition active:scale-90"
+              onClick={toggleSelectAll}
+              className="rounded-full px-3 py-1.5 text-[14px] font-medium text-accent transition active:scale-95"
             >
-              <MagnifyingGlass size={20} weight="bold" />
+              {allVisibleSelected ? "Снять всё" : "Выбрать всё"}
             </button>
-            <div className="relative">
-              <button
-                type="button"
-                aria-label="Создать"
-                onClick={() => setMenuOpen((o) => !o)}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-white shadow-sm transition active:scale-90"
-              >
-                <Plus size={22} weight="bold" />
-              </button>
-              <PopoverMenu
-                open={menuOpen}
-                onClose={() => setMenuOpen(false)}
-                items={[
-                  {
-                    label: "Новое сообщение",
-                    icon: PencilSimpleLine,
-                    onClick: () => router.push("/chats/new-message"),
-                  },
-                  {
-                    label: "Создать группу",
-                    icon: UsersThree,
-                    onClick: () => router.push("/chats/new-group"),
-                  },
-                  {
-                    label: "Создать канал",
-                    icon: Megaphone,
-                    onClick: () => router.push("/chats/new-channel"),
-                  },
-                ]}
-              />
-            </div>
           </div>
-        </div>
-
-        {/* Поиск */}
-        <div className="mt-3 flex items-center gap-2 rounded-2xl bg-surface-2 px-3 py-2.5">
-          <MagnifyingGlass size={18} weight="bold" className="text-muted-2" />
-          <input
-            ref={searchRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Поиск"
-            className="w-full bg-transparent text-[15px] text-foreground placeholder:text-muted-2 focus:outline-none"
-          />
-          <QrCode size={18} weight="bold" className="text-muted-2" />
-        </div>
-
-        {/* Фильтры */}
-        <div className="mt-3 flex items-center gap-6">
-          {filters.map((f) => {
-            const active = filter === f.key;
-            return (
-              <button
-                key={f.key}
-                type="button"
-                onClick={() => setFilter(f.key)}
-                className="relative flex items-center gap-1.5 pb-2"
-              >
-                <span
-                  className={cn(
-                    "text-[15px] font-medium transition-colors",
-                    active ? "text-accent" : "text-muted"
-                  )}
+        ) : (
+          <>
+            <div className="flex items-center justify-between">
+              <ConnectionTitle />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Поиск"
+                  onClick={() => searchRef.current?.focus()}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-muted transition active:scale-90"
                 >
-                  {f.label}
-                </span>
-                {active && (
-                  <motion.span
-                    layoutId="chat-filter"
-                    className="absolute -bottom-px left-0 right-0 h-[2.5px] rounded-full bg-accent"
-                    transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                  <MagnifyingGlass size={20} weight="bold" />
+                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    aria-label="Создать"
+                    onClick={() => setMenuOpen((o) => !o)}
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-white shadow-sm transition active:scale-90"
+                  >
+                    <Plus size={22} weight="bold" />
+                  </button>
+                  <PopoverMenu
+                    open={menuOpen}
+                    onClose={() => setMenuOpen(false)}
+                    items={[
+                      {
+                        label: "Новое сообщение",
+                        icon: PencilSimpleLine,
+                        onClick: () => router.push("/chats/new-message"),
+                      },
+                      {
+                        label: "Создать группу",
+                        icon: UsersThree,
+                        onClick: () => router.push("/chats/new-group"),
+                      },
+                      {
+                        label: "Создать канал",
+                        icon: Megaphone,
+                        onClick: () => router.push("/chats/new-channel"),
+                      },
+                    ]}
                   />
-                )}
-              </button>
-            );
-          })}
-        </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Поиск */}
+            <div className="mt-3 flex items-center gap-2 rounded-2xl bg-surface-2 px-3 py-2.5">
+              <MagnifyingGlass size={18} weight="bold" className="text-muted-2" />
+              <input
+                ref={searchRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Поиск"
+                className="w-full bg-transparent text-[15px] text-foreground placeholder:text-muted-2 focus:outline-none"
+              />
+              <QrCode size={18} weight="bold" className="text-muted-2" />
+            </div>
+
+            {/* Фильтры */}
+            {!query.trim() && !showArchived && (
+              <div className="mt-3 flex items-center gap-6">
+                {filters.map((f) => {
+                  const active = filter === f.key;
+                  return (
+                    <button
+                      key={f.key}
+                      type="button"
+                      onClick={() => setFilter(f.key)}
+                      className="relative flex items-center gap-1.5 pb-2"
+                    >
+                      <span
+                        className={cn(
+                          "text-[15px] font-medium transition-colors",
+                          active ? "text-accent" : "text-muted"
+                        )}
+                      >
+                        {f.label}
+                      </span>
+                      {active && (
+                        <motion.span
+                          layoutId="chat-filter"
+                          className="absolute -bottom-px left-0 right-0 h-[2.5px] rounded-full bg-accent"
+                          transition={ { type: "spring", stiffness: 500, damping: 40 } } 
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
       </header>
 
       {/* Список чатов */}
       <div className="no-scrollbar flex-1 overflow-y-auto border-t border-separator">
-        {!query.trim() && !showArchived && <StickerPromoBanner />}
+        {!query.trim() && !showArchived && !selectMode && <StickerPromoBanner />}
         {/* Вход в архив (когда есть архивные чаты и нет поиска) */}
-        {!query.trim() && !showArchived && archivedCount > 0 && (
+        {!query.trim() && !showArchived && !selectMode && archivedCount > 0 && (
           <button
             type="button"
             onClick={() => setShowArchived(true)}
@@ -306,7 +466,7 @@ export default function ChatsPage() {
             <CaretRight size={16} weight="bold" className="text-muted-2" />
           </button>
         )}
-        {!query.trim() && showArchived && (
+        {!query.trim() && showArchived && !selectMode && (
           <button
             type="button"
             onClick={() => setShowArchived(false)}
@@ -319,33 +479,42 @@ export default function ChatsPage() {
         {visible.map((conv, i) => {
             const preview = lastPreview(conv);
             const unread = countUnread(conv);
+            const isSelected = selected.has(conv.id);
             return (
               <motion.button
                 key={conv.id}
                 type="button"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.03, duration: 0.25 }}
-                whileTap={{ backgroundColor: "rgba(120,120,128,0.12)" }}
-                onClick={() => {
-                  if (longPressRef.current) {
-                    longPressRef.current = false;
-                    return;
-                  }
-                  router.push(`/chats/${conv.id}`);
-                }}
+                initial={ { opacity: 0 } } 
+                animate={ { opacity: 1 } } 
+                transition={ { duration: 0.15, delay: Math.min(i * 0.015, 0.2) } } 
+                whileTap={ { scale: 0.99 } } 
+                onClick={() => onRowClick(conv)}
                 onContextMenu={(e) => {
                   e.preventDefault();
-                  openCtxMenu(conv, e.clientX, e.clientY);
+                  if (selectMode) toggleSelect(conv.id);
+                  else openCtxMenu(conv, e.clientX, e.clientY);
                 }}
-                onPointerDown={(e) =>
-                  startLongPress(conv, e.clientX, e.clientY)
-                }
+                onPointerDown={() => startLongPress(conv)}
                 onPointerUp={cancelLongPress}
                 onPointerLeave={cancelLongPress}
                 onPointerMove={cancelLongPress}
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-2/70"
+                className={cn(
+                  "flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors",
+                  isSelected ? "bg-accent/10" : "hover:bg-surface-2/70"
+                )}
               >
+                {selectMode && (
+                  <span
+                    className={cn(
+                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+                      isSelected
+                        ? "border-accent bg-accent text-white"
+                        : "border-muted-2 text-transparent"
+                    )}
+                  >
+                    <Check size={14} weight="bold" />
+                  </span>
+                )}
                 <div className="relative">
                   <Avatar
                     initials={conv.initials}
@@ -390,7 +559,13 @@ export default function ChatsPage() {
                     {conv.verified && (
                       <span className="shrink-0 text-accent">✓</span>
                     )}
-                    <span className="ml-auto shrink-0 text-xs text-muted">
+                    <span className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted">
+                      {conv.muted && (
+                        <BellSlash size={13} weight="fill" className="text-muted-2" />
+                      )}
+                      {conv.pinned && (
+                        <PushPin size={13} weight="fill" className="text-muted-2" />
+                      )}
                       {preview.time}
                     </span>
                   </div>
@@ -437,16 +612,64 @@ export default function ChatsPage() {
         )}
 
         {visible.length === 0 && !query.trim() && (
-          <EmptyChats hasQuery={false} />
+          <EmptyChats hasQuery={false} filter={filter} />
         )}
         {visible.length === 0 &&
           query.trim() &&
           !peopleLoading &&
           people.length === 0 &&
-          messageMatches.length === 0 && <EmptyChats hasQuery={true} />}
+          messageMatches.length === 0 && <EmptyChats hasQuery={true} filter={filter} />}
+        {selectMode && <div className="h-20" />}
       </div>
 
-      {/* Контекстное меню чата */}
+      {/* Нижняя панель действий (режим выбора) */}
+      <AnimatePresence>
+        {selectMode && (
+          <motion.div
+            initial={ { y: 80, opacity: 0 } } 
+            animate={ { y: 0, opacity: 1 } } 
+            exit={ { y: 80, opacity: 0 } } 
+            transition={ { type: "spring", stiffness: 500, damping: 40 } } 
+            className="absolute inset-x-0 bottom-0 z-30 border-t border-separator bg-surface px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2"
+          >
+            <div className="flex items-center justify-around">
+              <ActionBtn
+                icon={Checks}
+                label="Прочитать"
+                disabled={selected.size === 0}
+                onClick={doRead}
+              />
+              <ActionBtn
+                icon={allPinned ? PushPinSlash : PushPin}
+                label={allPinned ? "Открепить" : "Закрепить"}
+                disabled={selected.size === 0}
+                onClick={doPin}
+              />
+              <ActionBtn
+                icon={allMuted ? Bell : BellSlash}
+                label={allMuted ? "Звук" : "Без звука"}
+                disabled={selected.size === 0}
+                onClick={doMute}
+              />
+              <ActionBtn
+                icon={Archive}
+                label={allArchived ? "Из архива" : "В архив"}
+                disabled={selected.size === 0}
+                onClick={doArchive}
+              />
+              <ActionBtn
+                icon={Trash}
+                label="Удалить"
+                danger
+                disabled={selected.size === 0}
+                onClick={doDelete}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Контекстное меню чата (правый клик на десктопе) */}
       {ctxMenu && (
         <>
           <div
@@ -461,6 +684,22 @@ export default function ChatsPage() {
             className="fixed z-50 min-w-[210px] overflow-hidden rounded-2xl bg-surface py-1 shadow-xl ring-1 ring-separator"
             style={ { top: ctxMenu.y, left: ctxMenu.x } }
           >
+            <CtxItem
+              icon={ctxMenu.conv.pinned ? PushPinSlash : PushPin}
+              label={ctxMenu.conv.pinned ? "Открепить" : "Закрепить"}
+              onClick={() => {
+                setPinned(ctxMenu.conv.id, !ctxMenu.conv.pinned);
+                setCtxMenu(null);
+              }}
+            />
+            <CtxItem
+              icon={Checks}
+              label="Отметить прочитанным"
+              onClick={() => {
+                markChatRead(ctxMenu.conv.id);
+                setCtxMenu(null);
+              }}
+            />
             <CtxItem
               icon={Archive}
               label={ctxMenu.conv.archived ? "Из архива" : "Архивировать"}
@@ -478,18 +717,66 @@ export default function ChatsPage() {
               }}
             />
             <CtxItem
+              icon={Check}
+              label="Выбрать"
+              onClick={() => {
+                enterSelect(ctxMenu.conv.id);
+              }}
+            />
+            <CtxItem
               icon={Trash}
               label="Удалить чат"
               danger
               onClick={() => {
-                deleteChat(ctxMenu.conv.id);
+                const id = ctxMenu.conv.id;
                 setCtxMenu(null);
+                deleteChat(id);
               }}
             />
           </div>
         </>
       )}
+
+      <ConfirmSheet config={confirm} onClose={() => setConfirm(null)} />
     </div>
+  );
+}
+
+/** Кнопка действия в нижней панели режима выбора. */
+function ActionBtn({
+  icon: Icon,
+  label,
+  onClick,
+  danger,
+  disabled,
+}: {
+  icon: typeof Archive;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex min-w-[56px] flex-col items-center gap-1 rounded-xl px-2 py-1.5 transition active:scale-90 disabled:opacity-40"
+    >
+      <Icon
+        size={24}
+        weight="regular"
+        className={danger ? "text-red-500" : "text-accent"}
+      />
+      <span
+        className={cn(
+          "text-[11px] font-medium",
+          danger ? "text-red-500" : "text-muted"
+        )}
+      >
+        {label}
+      </span>
+    </button>
   );
 }
 
@@ -585,20 +872,26 @@ function highlightSnippet(text: string, query: string) {
   );
 }
 
-function EmptyChats({ hasQuery }: { hasQuery: boolean }) {
+function EmptyChats({ hasQuery, filter }: { hasQuery: boolean; filter: ChatFilter }) {
+  const emptyText =
+    filter === "new"
+      ? "Нет непрочитанных"
+      : filter === "channels"
+        ? "Нет каналов"
+        : "Пока нет чатов";
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-5 px-10 py-24 text-center">
       <motion.div
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 240, damping: 18 }}
+        initial={ { scale: 0.8, opacity: 0 } } 
+        animate={ { scale: 1, opacity: 1 } } 
+        transition={ { type: "spring", stiffness: 300, damping: 22 } } 
         className="flex h-24 w-24 items-center justify-center rounded-full bg-surface-2"
       >
         <ChatsCircle size={44} weight="duotone" className="text-accent" />
       </motion.div>
       <div className="space-y-1.5">
         <p className="text-lg font-semibold text-foreground">
-          {hasQuery ? "Ничего не найдено" : "Пока нет чатов"}
+          {hasQuery ? "Ничего не найдено" : emptyText}
         </p>
         <p className="text-sm leading-relaxed text-muted">
           {hasQuery ? "Попробуйте изменить запрос" : "Начните новую переписку"}

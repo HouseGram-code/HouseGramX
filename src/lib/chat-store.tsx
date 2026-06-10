@@ -176,6 +176,10 @@ export interface Conversation {
   lastReadTs?: number;
   /** Чат скрыт в архиве (локальная настройка устройства). */
   archived?: boolean;
+  /** Чат закреплён вверху списка (локальная настройка устройства). */
+  pinned?: boolean;
+  /** Порядок среди закреплённых (меньше — выше). */
+  pinnedAt?: number;
   /** Таймер автоудаления сообщений в секундах (0/undefined — выключено). */
   ttlSeconds?: number;
   /** Особый чат «Избранное» (Saved Messages). Локальный, без облака. */
@@ -300,7 +304,7 @@ interface ChatContextValue {
   markChatRead: (chatId: string) => void;
   /** Заблокировать/разблокировать собеседника (личный чат). */
   toggleBlock: (chatId: string) => void;
-  /** Включить/выключить уведомления чата. durationMs — временное отключение. */
+  /** Включить/вы��лючить уведомления чата. durationMs — временное отключение. */
   setMuted: (chatId: string, muted: boolean, durationMs?: number) => void;
   forwardMessage: (
     fromChatId: string,
@@ -341,6 +345,8 @@ interface ChatContextValue {
   deleteChat: (chatId: string) => void;
   /** Архивировать/разархивировать чат (локально для устройства). */
   setArchived: (chatId: string, archived: boolean) => void;
+  /** Закрепить/открепить чат вверху списка (локально для устройства). */
+  setPinned: (chatId: string, pinned: boolean) => void;
   /** Установить таймер исчезающих сообщений (секунды; 0 — выключить). */
   setChatTtl: (chatId: string, ttlSeconds: number) => void;
   /** Список запланированных сообщений (отложенная отправка). */
@@ -1346,6 +1352,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     update(chatId, (c) => ({ ...c, archived }));
   };
 
+  const setPinned: ChatContextValue["setPinned"] = (chatId, pinned) => {
+    // Закрепление — локальное состояние устройства, в облако не зеркалится.
+    update(chatId, (c) => ({
+      ...c,
+      pinned,
+      pinnedAt: pinned ? Date.now() : undefined,
+    }));
+  };
+
   const setChatTtl: ChatContextValue["setChatTtl"] = (chatId, ttlSeconds) => {
     const next = ttlSeconds > 0 ? ttlSeconds : undefined;
     update(chatId, (c) => ({ ...c, ttlSeconds: next }));
@@ -1950,6 +1965,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         clearHistory,
         deleteChat,
         setArchived,
+        setPinned,
         setChatTtl,
         scheduled,
         scheduleMessage,
