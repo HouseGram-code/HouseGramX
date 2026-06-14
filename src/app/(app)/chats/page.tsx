@@ -159,6 +159,13 @@ export default function ChatsPage() {
     [conversations]
   );
 
+  // Кол-во активных (не архивных) чатов с непрочитанными — для бейджа
+  // на вкладке «Новые».
+  const unreadChatsCount = useMemo(
+    () => conversations.filter((c) => !c.archived && countUnread(c) > 0).length,
+    [conversations]
+  );
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     // Во время поиска ищем по всем чатам (включая архив); иначе —
@@ -420,9 +427,9 @@ export default function ChatsPage() {
               <QrCode size={18} weight="bold" className="text-muted-2" />
             </div>
 
-            {/* Фильтры */}
+            {/* Фильтры (segmented control с бейджем непрочитанных) */}
             {!query.trim() && !showArchived && (
-              <div className="mt-3 flex items-center gap-6">
+              <div className="mt-3 flex items-center gap-1.5 rounded-2xl bg-surface-2 p-1">
                 {filters.map((f) => {
                   const active = filter === f.key;
                   return (
@@ -430,22 +437,27 @@ export default function ChatsPage() {
                       key={f.key}
                       type="button"
                       onClick={() => setFilter(f.key)}
-                      className="relative flex items-center gap-1.5 pb-2"
+                      className="relative flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-1.5"
                     >
+                      {active && (
+                        <motion.span
+                          layoutId="chat-filter"
+                          className="absolute inset-0 rounded-xl bg-surface shadow-sm ring-1 ring-separator"
+                          transition={ { type: "spring", stiffness: 500, damping: 40 } } 
+                        />
+                      )}
                       <span
                         className={cn(
-                          "text-[15px] font-medium transition-colors",
+                          "relative z-10 text-[14px] font-medium transition-colors",
                           active ? "text-accent" : "text-muted"
                         )}
                       >
                         {f.label}
                       </span>
-                      {active && (
-                        <motion.span
-                          layoutId="chat-filter"
-                          className="absolute -bottom-px left-0 right-0 h-[2.5px] rounded-full bg-accent"
-                          transition={ { type: "spring", stiffness: 500, damping: 40 } } 
-                        />
+                      {f.key === "new" && unreadChatsCount > 0 && (
+                        <span className="relative z-10 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-none text-white">
+                          {unreadChatsCount > 99 ? "99+" : unreadChatsCount}
+                        </span>
                       )}
                     </button>
                   );
