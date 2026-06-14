@@ -49,7 +49,7 @@ export function BottomNav() {
                   {active && (
                     <motion.span
                       layoutId="nav-pill"
-                      className="absolute inset-0 rounded-full bg-accent/12"
+                      className="absolute inset-0 rounded-2xl bg-gradient-to-b from-accent/20 to-accent/10 ring-1 ring-accent/15"
                       transition={{
                         type: "spring",
                         stiffness: 450,
@@ -92,12 +92,19 @@ export function BottomNav() {
                   animate={{ scale: active ? 1.06 : 1 }}
                   transition={{ type: "spring", stiffness: 400, damping: 25 }}
                   className={cn(
-                    "text-[11px] font-medium transition-colors duration-200",
-                    active ? "text-accent" : "text-muted"
+                    "text-[11px] transition-colors duration-200",
+                    active ? "font-semibold text-accent" : "font-medium text-muted"
                   )}
                 >
                   {t(item.labelKey)}
                 </motion.span>
+                {/* Активный индикатор-точка под подписью */}
+                <motion.span
+                  initial={false}
+                  animate={{ scale: active ? 1 : 0, opacity: active ? 1 : 0 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                  className="h-1 w-1 rounded-full bg-accent"
+                />
               </Link>
             </li>
           );

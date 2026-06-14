@@ -47,7 +47,7 @@ export function SideNav() {
                 "group relative flex items-center gap-3 rounded-2xl px-3 py-3 transition-colors",
                 "justify-center lg:justify-start",
                 active
-                  ? "bg-accent/10 text-accent"
+                  ? "bg-gradient-to-r from-accent/15 to-accent/5 text-accent ring-1 ring-accent/15"
                   : "text-muted hover:bg-surface-2 hover:text-foreground"
               )}
             >
