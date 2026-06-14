@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+:root {
+  --background: #efeff4;
+  --surface: #ffffff;
+  --surface-2: #f7f7fa;
+  --foreground: #11181c;
+  --muted: #8a8a8e;
+  --muted-2: #b8b8bd;
+  --separator: #ececf0;
+  --accent: #fa3a3a;
+  --accent-press: #e22d2d;
+  --badge: #fa3a3a;
+  --tab-inactive: #8a8a8e;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-2: var(--muted-2);
+  --color-separator: var(--separator);
+  --color-accent: var(--accent);
+  --color-accent-press: var(--accent-press);
+  --color-badge: var(--badge);
+  --font-sans: var(--font-geist-sans);
+  --radius-card: 18px;
+}
+
+/* Принудительно тёмная (выбор пользователя) */
+:root[data-theme="dark"] {
+  --background: #000000;
+  --surface: #1c1c1e;
+  --surface-2: #2c2c2e;
+  --foreground: #f2f2f7;
+  --muted: #98989f;
+  --muted-2: #636366;
+  --separator: #2c2c2e;
+  --accent: #ff453a;
+  --accent-press: #ff6961;
+  --badge: #ff453a;
+  --tab-inactive: #98989f;
+}
+
+/* Авто: тёмная по системе, если пользователь не выбрал «светлую» */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #000000;
+    --surface: #1c1c1e;
+    --surface-2: #2c2c2e;
+    --foreground: #f2f2f7;
+    --muted: #98989f;
+    --muted-2: #636366;
+    --separator: #2c2c2e;
+    --accent: #ff453a;
+    --accent-press: #ff6961;
+    --badge: #ff453a;
+    --tab-inactive: #98989f;
+  }
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+  overscroll-behavior: none;
+}
+
+/* Hide scrollbars but keep scroll */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Безопасные зоны (чёлка/вырез iPhone, статус-бар Android) */
+.safe-top {
+  padding-top: max(env(safe-area-inset-top), 0px);
+}
+.pt-safe {
+  padding-top: calc(env(safe-area-inset-top) + 0.5rem);
+}
+
+/* Десктопные hover-эффекты только для устройств с мышью */
+@media (hover: hover) and (pointer: fine) {
+  .desktop-hover:hover {
+    background-color: var(--surface-2);
+  }
+}
+
+/* Баннер «Создай свой первый стикер»: белый блик пробегает 2 раза */
+@keyframes sticker-shine {
+  from {
+    transform: translateX(-220%) skewX(-12deg);
+  }
+  to {
+    transform: translateX(420%) skewX(-12deg);
+  }
+}
+.animate-sticker-shine {
+  animation: sticker-shine 1.5s ease-in-out 2 both;
+}
+
+/* «Анимированный» эмодзи рядом с текстом баннера */
+@keyframes sticker-emoji-bounce {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-7deg) scale(1);
+  }
+  50% {
+    transform: translateY(-4px) rotate(7deg) scale(1.12);
+  }
+}
+.animate-sticker-emoji {
+  animation: sticker-emoji-bounce 1.3s ease-in-out infinite;
+}
