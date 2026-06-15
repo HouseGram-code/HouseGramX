@@ -57,17 +57,17 @@ export default function SettingsPage() {
           type="button"
           aria-label="QR-код"
           onClick={() => router.push("/settings/profile/qr")}
-          className="text-foreground transition active:opacity-60"
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-foreground transition active:scale-90 active:bg-surface-2/70 md:hover:bg-surface-2/80"
         >
-          <QrCode size={24} weight="regular" />
+          <QrCode size={22} weight="regular" />
         </button>
         <button
           type="button"
           aria-label="Редактировать профиль"
           onClick={() => router.push("/settings/profile")}
-          className="text-foreground transition active:opacity-60"
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-foreground transition active:scale-90 active:bg-surface-2/70 md:hover:bg-surface-2/80"
         >
-          <PencilSimple size={22} weight="regular" />
+          <PencilSimple size={20} weight="regular" />
         </button>
       </div>
 
@@ -222,7 +222,7 @@ export default function SettingsPage() {
                   setSigningOut(true);
                   await signOut();
                 }}
-                className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-center transition-colors hover:bg-surface-2/60 active:bg-surface-2 disabled:opacity-50"
+                className="flex min-h-[48px] w-full items-center justify-center gap-2 px-4 py-3.5 text-center transition-colors hover:bg-surface-2/60 active:bg-surface-2 disabled:opacity-50"
               >
                 <SignOut size={20} weight="bold" className="text-accent" />
                 <span className="text-[15px] font-semibold text-accent">

@@ -96,13 +96,13 @@ export function NavRow({
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.04, duration: 0.2 }}
-      whileTap={{ scale: 0.985 }}
-      className="flex w-full items-center gap-3 pl-4 text-left transition-colors hover:bg-surface-2/60 active:bg-surface-2"
+      whileTap={{ scale: 0.975 }}
+      className="group flex w-full items-center gap-3 pl-4 text-left transition-colors hover:bg-surface-2/60 active:bg-surface-2"
     >
       {Icon &&
         (iconBg ? (
           <span
-            className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] shadow-sm"
+            className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] shadow-sm transition-transform duration-200 group-active:scale-90"
             style={{ backgroundColor: iconBg }}
           >
             <Icon size={19} weight="fill" className="text-white" />
@@ -117,14 +117,18 @@ export function NavRow({
         ))}
       <div
         className={cn(
-          "flex flex-1 items-center justify-between py-3 pr-4",
+          "flex min-h-[44px] flex-1 items-center justify-between py-3 pr-4",
           !last && "border-b border-separator"
         )}
       >
         <span className="text-[15px] text-foreground">{label}</span>
         <span className="flex items-center gap-1.5">
           {value && <span className="text-[15px] text-muted">{value}</span>}
-          <CaretRight size={18} weight="bold" className="text-muted-2" />
+          <CaretRight
+            size={18}
+            weight="bold"
+            className="text-muted-2 transition-transform duration-200 group-hover:translate-x-0.5"
+          />
         </span>
       </div>
     </motion.button>
@@ -147,11 +151,11 @@ export function ChoiceRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center pl-4 text-left transition-colors hover:bg-surface-2/60 active:bg-surface-2"
+      className="group flex w-full items-center pl-4 text-left transition-colors hover:bg-surface-2/60 active:bg-surface-2"
     >
       <div
         className={cn(
-          "flex flex-1 items-center justify-between py-3.5 pr-4",
+          "flex min-h-[48px] flex-1 items-center justify-between py-3.5 pr-4",
           !last && "border-b border-separator"
         )}
       >
