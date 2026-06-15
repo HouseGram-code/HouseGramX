@@ -34,6 +34,7 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { BugHunterBadge } from "@/components/BugHunterBadge";
 import { PremiumBadge } from "@/components/PremiumBadge";
 import { MessageBubble } from "@/components/MessageBubble";
+import { RichText } from "@/components/RichText";
 import { ChannelPost } from "@/components/ChannelPost";
 import { StickerPicker } from "@/components/StickerPicker";
 import { StickerSetSheet } from "@/components/StickerSetSheet";
@@ -1346,6 +1347,18 @@ export default function ChatPage({
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Живой предпросмотр премиум-эмодзи (в textarea картинки не видны) */}
+          {!recorder.recording && hasPremiumEmoji(draft) && (
+            <div className="mb-1.5 flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2">
+              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-muted">
+                Превью
+              </span>
+              <div className="min-w-0 flex-1 overflow-hidden">
+                <RichText text={draft} fontSize={15} />
+              </div>
+            </div>
+          )}
 
           {recorder.recording ? (
             <RecordingBar
