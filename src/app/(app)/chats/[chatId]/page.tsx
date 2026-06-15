@@ -34,7 +34,7 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { BugHunterBadge } from "@/components/BugHunterBadge";
 import { PremiumBadge } from "@/components/PremiumBadge";
 import { MessageBubble } from "@/components/MessageBubble";
-import { RichInput } from "@/components/RichInput";
+import { RichInput, type RichInputHandle } from "@/components/RichInput";
 import { ChannelPost } from "@/components/ChannelPost";
 import { StickerPicker } from "@/components/StickerPicker";
 import { StickerSetSheet } from "@/components/StickerSetSheet";
@@ -147,7 +147,7 @@ export default function ChatPage({
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<RichInputHandle>(null);
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
 
   const conv = getConversation(chatId);
@@ -1185,7 +1185,7 @@ export default function ChatPage({
           allowPremium={conv.saved || myPremium}
           onPick={(st) => handlePickSticker(st.src, st.emoji, st.id)}
           onEmoji={(e) => {
-            setDraft((d) => d + e);
+            textareaRef.current?.insert(e);
             useEmoji(e);
           }}
         />
@@ -1371,8 +1371,8 @@ export default function ChatPage({
                 </button>
 
                 <RichInput
+                  ref={textareaRef}
                   value={draft}
-                  editableRef={textareaRef}
                   onChange={(v) => {
                     setDraft(v);
                     if (v.trim()) typing.notifyTyping();

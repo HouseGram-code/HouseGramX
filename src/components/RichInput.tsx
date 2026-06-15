@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+} from "react";
 import { PREMIUM_EMOJIS } from "@/lib/premium-emoji";
 
 const PE_SRC: Record<string, string> = Object.fromEntries(
@@ -9,15 +14,18 @@ const PE_SRC: Record<string, string> = Object.fromEntries(
 
 const TOKEN_RE = /\{pe:([a-z0-9_-]+)\}/gi;
 
+export interface RichInputHandle {
+  focus: () => void;
+  /** Вставляет фрагмент (обычный эмодзи или токен {pe:id}) в позицию курсора. */
+  insert: (fragment: string) => void;
+}
+
 interface RichInputProps {
   value: string;
   onChange: (v: string) => void;
   onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void;
-  onFocus?: () => void;
   placeholder?: string;
   className?: string;
-  /** Внешняя ссылка на редактируемый элемент (для фокуса). */
-  editableRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 function escapeHtml(s: string): string {
@@ -61,74 +69,85 @@ function serialize(node: HTMLElement): string {
   return out;
 }
 
-function placeCaretEnd(el: HTMLElement) {
-  try {
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    range.collapse(false);
-    const sel = window.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-  } catch {
-    /* ignore */
-  }
-}
-
 /**
- * Поле ввода с инлайн премиум-эмодзи (как в Telegram). Хранит значение строкой
- * с токенами {pe:id}, но показывает их картинками прямо в поле.
+ * Поле ввода с инлайн премиум-эмодзи (как в Telegram). Значение — строка с
+ * токенами {pe:id}, но в поле они показываются картинками.
  */
-export function RichInput({
-  value,
-  onChange,
-  onKeyDown,
-  onFocus,
-  placeholder,
-  className,
-  editableRef,
-}: RichInputProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  const lastValue = useRef<string>("\u0000"); // заведомо отличается от ""
+export const RichInput = forwardRef<RichInputHandle, RichInputProps>(
+  function RichInput({ value, onChange, onKeyDown, placeholder, className }, ref) {
+    const el = useRef<HTMLDivElement>(null);
+    const lastValue = useRef<string>("\u0000");
 
-  // Внешнее изменение value (вставка эмодзи, очистка) → перерисовываем DOM.
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (value !== lastValue.current) {
-      el.innerHTML = toHtml(value);
-      lastValue.current = value;
-      if (document.activeElement === el || value) placeCaretEnd(el);
-    }
-  }, [value]);
+    const emit = () => {
+      const node = el.current;
+      if (!node) return;
+      let v = serialize(node);
+      if (v === "\n" || v.trim() === "") {
+        node.innerHTML = "";
+        v = "";
+      }
+      lastValue.current = v;
+      onChange(v);
+    };
 
-  const handleInput = () => {
-    const el = ref.current;
-    if (!el) return;
-    let v = serialize(el);
-    // Нормализуем «пустоту», чтобы сработал placeholder (:empty).
-    if (v === "\n" || v.trim() === "") {
-      el.innerHTML = "";
-      v = "";
-    }
-    lastValue.current = v;
-    onChange(v);
-  };
+    // Внешнее изменение value (очистка после отправки и т.п.) → перерисовка.
+    useEffect(() => {
+      const node = el.current;
+      if (!node) return;
+      if (value !== lastValue.current) {
+        node.innerHTML = toHtml(value);
+        lastValue.current = value;
+      }
+    }, [value]);
 
-  return (
-    <div
-      ref={(node) => {
-        ref.current = node;
-        if (editableRef) editableRef.current = node;
-      }}
-      contentEditable
-      role="textbox"
-      aria-multiline="true"
-      suppressContentEditableWarning
-      data-placeholder={placeholder}
-      onInput={handleInput}
-      onKeyDown={onKeyDown}
-      onFocus={onFocus}
-      className={className}
-    />
-  );
-}
+    useImperativeHandle(ref, () => ({
+      focus: () => el.current?.focus(),
+      insert: (fragment: string) => {
+        const node = el.current;
+        if (!node) return;
+        node.focus();
+        const sel = window.getSelection();
+        let range: Range;
+        if (sel && sel.rangeCount && node.contains(sel.anchorNode)) {
+          range = sel.getRangeAt(0);
+        } else {
+          range = document.createRange();
+          range.selectNodeContents(node);
+          range.collapse(false);
+        }
+        range.deleteContents();
+        const temp = document.createElement("div");
+        temp.innerHTML = toHtml(fragment);
+        const frag = document.createDocumentFragment();
+        let lastNode: ChildNode | null = null;
+        while (temp.firstChild) {
+          lastNode = temp.firstChild;
+          frag.appendChild(temp.firstChild);
+        }
+        range.insertNode(frag);
+        if (lastNode) {
+          const after = document.createRange();
+          after.setStartAfter(lastNode);
+          after.collapse(true);
+          sel?.removeAllRanges();
+          sel?.addRange(after);
+        }
+        emit();
+      },
+    }));
+
+    return (
+      <div
+        ref={el}
+        contentEditable
+        role="textbox"
+        aria-multiline="true"
+        suppressContentEditableWarning
+        data-placeholder={placeholder}
+        onInput={emit}
+        onKeyDown={onKeyDown}
+        className={className}
+      />
+    );
+  }
+);

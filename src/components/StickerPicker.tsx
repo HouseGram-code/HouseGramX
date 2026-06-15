@@ -118,11 +118,11 @@ export function StickerPicker({
                     )}
                   >
                     <Key size={10} weight="fill" />
-                    {!isPremium && !allowPremium
-                      ? "Premium"
-                      : allowPremium && !isPremium
-                        ? "Бесплатно"
-                        : "Открыт"}
+                    {isPremium
+                      ? "Открыто"
+                      : !allowPremium
+                        ? "Premium"
+                        : "Бесплатно"}
                   </span>
                 </div>
                 <div className="no-scrollbar flex gap-1.5 overflow-x-auto">
@@ -313,7 +313,11 @@ export function StickerPicker({
                               )}
                             >
                               <Key size={10} weight="fill" />
-                              {locked ? "Premium" : allowPremium ? "Бесплатно" : "Открыт"}
+                              {isPremium
+                                ? "Открыто"
+                                : locked
+                                  ? "Premium"
+                                  : "Бесплатно"}
                             </span>
                           )}
                         </span>
