@@ -577,6 +577,8 @@ export default function ChatPage({
                   )
                 ) : peerBlockedMe ? (
                   <span className="text-muted">был(а) давно</span>
+                ) : conv.saved ? (
+                  <span className="text-muted">Сохранённые сообщения</span>
                 ) : conv.activity || someoneTyping ? (
                   <ActivityText activity={conv.activity ?? "typing"} />
                 ) : peerOnline ? (
@@ -592,8 +594,9 @@ export default function ChatPage({
             </div>
           </button>
 
-          {/* Звонок: группа — голосовой чат, личка — 1-на-1. Боту нельзя. */}
-          {(isGroup || conv.kind === "private") && (
+          {/* Звонок: группа — голосовой чат, личка — 1-на-1. Боту и
+              «Избранному» нельзя. */}
+          {(isGroup || (conv.kind === "private" && !conv.saved)) && (
             <button
               type="button"
               aria-label={isGroup ? "Голосовой чат" : "Позвонить"}

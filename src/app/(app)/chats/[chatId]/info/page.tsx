@@ -84,6 +84,7 @@ export default function ChatInfoPage({
   const isChannel = conv.kind === "channel";
   const isBot = conv.kind === "bot";
   const isPrivate = conv.kind === "private";
+  const isSaved = !!conv.saved; // «Избранное» — чат с самим собой
   const iBlockedPeer = !!conv.blocked; // я заблокировал собеседника
   const peerBlockedMe = !!conv.peerBlockedMe; // собеседник заблокировал меня
   const subs = conv.subscribers ?? 1;
@@ -121,17 +122,19 @@ export default function ChatInfoPage({
 
   const statusText = isChannel
     ? subsLabel(subs)
-    : isBot
-      ? "бот"
-      : peerBlockedMe
-        ? "был(а) давно"
-        : online
-          ? "в сети"
-          : s.lastSeenVisibility === "everyone"
-            ? formatLastSeen(
-                liveLastSeen ?? peer?.lastSeen ?? conv.lastSeen ?? lastPeerMsgTs,
-              )
-            : "был(а) недавно";
+    : isSaved
+      ? "Сохранённые сообщения"
+      : isBot
+        ? "бот"
+        : peerBlockedMe
+          ? "был(а) давно"
+          : online
+            ? "в сети"
+            : s.lastSeenVisibility === "everyone"
+              ? formatLastSeen(
+                  liveLastSeen ?? peer?.lastSeen ?? conv.lastSeen ?? lastPeerMsgTs,
+                )
+              : "был(а) недавно";
 
   return (
     <div className="flex h-full flex-1 flex-col bg-background">
@@ -218,7 +221,7 @@ export default function ChatInfoPage({
 
         {/* Быстрые действия */}
         <div className="grid grid-cols-3 gap-2 px-3">
-          {isPrivate && (
+          {isPrivate && !isSaved && (
             <QuickAction
               icon={Phone}
               label="Позвонить"
@@ -325,8 +328,8 @@ export default function ChatInfoPage({
           </div>
         )}
 
-        {/* Блокировка — только для личных чатов */}
-        {isPrivate && (
+        {/* Блокировка — только для личных чатов (кроме «Избранного») */}
+        {isPrivate && !isSaved && (
           <div className="mt-4 px-3">
             <Card>
               <button
