@@ -1378,7 +1378,6 @@ export default function ChatPage({
                     if (v.trim()) typing.notifyTyping();
                   }}
                   onKeyDown={handleKeyDown}
-                  onFocus={() => setPickerOpen(false)}
                   placeholder={
                     editing
                       ? "Измените сообщение"
