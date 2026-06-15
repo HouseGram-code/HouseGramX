@@ -1,11 +1,14 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Password,
   ShieldCheck,
   Checks,
   Eye,
   Prohibit,
+  LockKey,
+  Star,
 } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import { SubScreen } from "@/components/SubScreen";
@@ -20,6 +23,7 @@ import { useSettings } from "@/lib/settings-store";
 import { useChats } from "@/lib/chat-store";
 import { useToast } from "@/components/Toast";
 import { useT, type TKey } from "@/lib/i18n";
+import { fetchMyPremium, setDmClosed, type MyPremium } from "@/lib/premium";
 
 const LAST_SEEN_KEYS: Record<string, TKey> = {
   everyone: "lastSeenEveryone",
@@ -34,6 +38,42 @@ export default function SecurityPage() {
   const { conversations } = useChats();
   const router = useRouter();
   const blockedCount = conversations.filter((c) => c.blocked).length;
+
+  // Premium-статус (для «Запрета личных сообщений»).
+  const [premium, setPremium] = useState<MyPremium | null>(null);
+  const [dmBusy, setDmBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    fetchMyPremium().then((p) => {
+      if (alive) setPremium(p);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const premiumActive = premium?.active ?? false;
+  const dmClosed = premium?.dmClosed ?? false;
+
+  const onToggleDmLock = async (next: boolean) => {
+    if (!premiumActive) {
+      show(t("dmLockPremiumOnly"));
+      router.push("/settings/premium");
+      return;
+    }
+    setDmBusy(true);
+    setPremium((p) => (p ? { ...p, dmClosed: next } : p));
+    try {
+      await setDmClosed(next);
+      show(next ? t("dmLockOn") : t("dmLockOff"));
+    } catch (e) {
+      setPremium((p) => (p ? { ...p, dmClosed: !next } : p));
+      show(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setDmBusy(false);
+    }
+  };
 
   return (
     <SubScreen title={t("security")}>
@@ -84,6 +124,22 @@ export default function SecurityPage() {
         />
       </Group>
       <GroupHint>{t("readReceiptsHint")}</GroupHint>
+
+      {/* Запрет личных сообщений — премиум-функция */}
+      <SectionTitle>HouseGram Premium</SectionTitle>
+      <Group>
+        <ToggleRow
+          icon={premiumActive ? LockKey : Star}
+          label={t("dmLock")}
+          checked={dmClosed}
+          onChange={onToggleDmLock}
+          disabled={dmBusy}
+          last
+        />
+      </Group>
+      <GroupHint>
+        {premiumActive ? t("dmLockHint") : t("dmLockPremiumOnly")}
+      </GroupHint>
     </SubScreen>
   );
 }

@@ -9,11 +9,8 @@ import {
   CheckCircle,
 } from "@phosphor-icons/react";
 import { SubScreen } from "@/components/SubScreen";
-import { Switch } from "@/components/Switch";
-import { useToast } from "@/components/Toast";
 import {
   fetchMyPremium,
-  setDmClosed,
   formatPremiumUntil,
   type MyPremium,
 } from "@/lib/premium";
@@ -115,9 +112,7 @@ function PremiumStar() {
 }
 
 export default function PremiumPage() {
-  const { show } = useToast();
   const [premium, setPremium] = useState<MyPremium | null>(null);
-  const [savingDm, setSavingDm] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -130,27 +125,6 @@ export default function PremiumPage() {
   }, []);
 
   const active = premium?.active ?? false;
-  const dmClosed = premium?.dmClosed ?? false;
-
-  const onToggleDm = async (next: boolean) => {
-    if (!active) {
-      show("Доступно с Premium");
-      return;
-    }
-    setSavingDm(true);
-    // Оптимистично обновляем UI.
-    setPremium((p) => (p ? { ...p, dmClosed: next } : p));
-    try {
-      await setDmClosed(next);
-      show(next ? "Личка закрыта" : "Личка открыта");
-    } catch (e) {
-      // Откат при ошибке.
-      setPremium((p) => (p ? { ...p, dmClosed: !next } : p));
-      show(e instanceof Error ? e.message : "Ошибка");
-    } finally {
-      setSavingDm(false);
-    }
-  };
 
   return (
     <SubScreen title="HouseGram Premium">
@@ -184,25 +158,15 @@ export default function PremiumPage() {
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-[15px] font-semibold text-foreground">
-                Закрыть личку
+                Закрытая личка
               </p>
               <p className="text-[13px] leading-snug text-muted">
-                Пока включено, никто не сможет написать вам в личные сообщения
+                Включается в «Настройки → Безопасность». Писать вам смогут
+                только пользователи с Premium.
               </p>
             </div>
-            <Switch
-              checked={dmClosed}
-              onChange={onToggleDm}
-              disabled={savingDm || !active}
-              label="Закрыть личку"
-            />
           </div>
         </div>
-        {!active && (
-          <p className="px-2 pt-2 text-[12px] leading-relaxed text-muted">
-            «Закрытая личка» доступна только с активным Premium.
-          </p>
-        )}
 
         {/* Цена */}
         <div className="mt-6 flex items-end justify-center gap-1.5">

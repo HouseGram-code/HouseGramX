@@ -80,6 +80,8 @@ export interface ProfileRow {
   last_seen?: string | null;
   official?: boolean | null;
   badge?: string | null;
+  premium_until?: string | null;
+  dm_closed?: boolean | null;
 }
 
 /** Найденный пользователь (для поиска и старта чата). */
@@ -736,6 +738,15 @@ export interface UserProfile {
   initials: string;
   official?: boolean;
   badge?: string;
+  /** Активен ли Premium. */
+  premium?: boolean;
+  /** Пользователь закрыл личку И его Premium активен (нельзя писать). */
+  dmClosed?: boolean;
+}
+
+/** Активен ли Premium по ISO-дате окончания. */
+function premiumActive(until?: string | null): boolean {
+  return !!until && new Date(until).getTime() > Date.now();
 }
 
 /** Загружает полный публичный профиль пользователя по id. */
@@ -746,12 +757,13 @@ export async function loadUserProfile(
   try {
     const { data } = await getSupabase()
       .from("profiles")
-      .select("id, name, username, avatar, color, bio, last_seen, official, badge")
+      .select("id, name, username, avatar, color, bio, last_seen, official, badge, premium_until, dm_closed")
       .eq("id", userId)
       .maybeSingle();
     if (!data) return null;
     const p = data as ProfileRow;
     const name = p.name || "Пользователь";
+    const premium = premiumActive(p.premium_until);
     return {
       id: p.id,
       name,
@@ -763,6 +775,8 @@ export async function loadUserProfile(
       initials: initialsOf(name),
       official: !!p.official,
       badge: p.badge || "",
+      premium,
+      dmClosed: premium && !!p.dm_closed,
     };
   } catch (e) {
     console.warn("[chat-remote] loadUserProfile:", e);

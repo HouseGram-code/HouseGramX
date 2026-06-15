@@ -64,6 +64,12 @@ const ru = {
   passcodeOff: "Код-пароль выключен",
   twoFaOn: "2FA включена",
   twoFaOff: "2FA выключена",
+  dmLock: "Запрет личных сообщений",
+  dmLockHint:
+    "Премиум-функция. Когда включено, писать вам в личные сообщения смогут только пользователи с Premium.",
+  dmLockPremiumOnly: "Доступно с HouseGram Premium",
+  dmLockOn: "Личные сообщения закрыты",
+  dmLockOff: "Личные сообщения открыты",
   // Заблокированные
   unblock: "Разблокировать",
   noBlocked: "Нет заблокированных пользователей",
@@ -127,6 +133,12 @@ const en: Record<TKey, string> = {
   unblock: "Unblock",
   noBlocked: "No blocked users",
   blockedHint: "Blocked users can't message you or see your profile.",
+  dmLock: "Lock direct messages",
+  dmLockHint:
+    "Premium feature. When enabled, only users with Premium can send you direct messages.",
+  dmLockPremiumOnly: "Available with HouseGram Premium",
+  dmLockOn: "Direct messages locked",
+  dmLockOff: "Direct messages open",
 };
 
 const uk: Record<TKey, string> = {
@@ -184,6 +196,12 @@ const uk: Record<TKey, string> = {
   noBlocked: "Немає заблокованих користувачів",
   blockedHint:
     "Заблоковані користувачі не можуть писати вам і бачити ваш профіль.",
+  dmLock: "Заборона особистих повідомлень",
+  dmLockHint:
+    "Преміум-функція. Коли увімкнено, писати вам зможуть лише користувачі з Premium.",
+  dmLockPremiumOnly: "Доступно з HouseGram Premium",
+  dmLockOn: "Особисті повідомлення закрито",
+  dmLockOff: "Особисті повідомлення відкрито",
 };
 
 const kk: Record<TKey, string> = {
@@ -241,6 +259,12 @@ const kk: Record<TKey, string> = {
   noBlocked: "Бұғатталған пайдаланушылар жоқ",
   blockedHint:
     "Бұғатталған пайдаланушылар сізге жаза алмайды және профиліңізді көре алмайды.",
+  dmLock: "Жеке хабарламаларға тыйым",
+  dmLockHint:
+    "Премиум-функция. Қосылған кезде сізге тек Premium бар пайдаланушылар жаза алады.",
+  dmLockPremiumOnly: "HouseGram Premium-мен қолжетімді",
+  dmLockOn: "Жеке хабарламалар жабық",
+  dmLockOff: "Жеке хабарламалар ашық",
 };
 
 const dicts = { ru, en, uk, kk } as const;

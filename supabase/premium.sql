@@ -62,7 +62,8 @@ as $fn$
 $fn$;
 
 -- ────────────────────────────────────────────────────────────────────────────
--- 4) Обновляем политику вставки сообщений: нельзя писать тому, кто закрыл личку
+-- 4) Обновляем политику вставки сообщений: нельзя писать тому, кто закрыл личку.
+--    ИСКЛЮЧЕНИЕ: отправитель с активным Premium может писать в обход.
 --    (повторяет финальную версию из admin.sql + новое условие).
 -- ────────────────────────────────────────────────────────────────────────────
 drop policy if exists "messages_insert" on public.messages;
@@ -73,7 +74,10 @@ create policy "messages_insert" on public.messages
     and (author_id = auth.uid() or author_id is null)
     and not public.sender_is_blocked(chat_id)
     and not public.is_banned()
-    and not public.recipient_dm_closed(chat_id)
+    and (
+      not public.recipient_dm_closed(chat_id)
+      or public.is_premium(auth.uid())
+    )
   );
 
 -- ────────────────────────────────────────────────────────────────────────────

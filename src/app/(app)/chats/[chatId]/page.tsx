@@ -26,6 +26,8 @@ import {
   Stop,
   TrashSimple,
   Prohibit,
+  LockKey,
+  Star,
 } from "@phosphor-icons/react";
 import { Avatar } from "@/components/Avatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
@@ -52,6 +54,7 @@ import {
   type Message,
 } from "@/lib/chat-store";
 import { loadUserProfile, type UserProfile } from "@/lib/chat-remote";
+import { fetchMyPremium } from "@/lib/premium";
 import { useGroupCall, useCallWatch } from "@/lib/group-call";
 import { useChatTyping } from "@/lib/typing";
 import { useSettings } from "@/lib/settings-store";
@@ -196,6 +199,18 @@ export default function ChatPage({
     };
   }, [conv?.kind, conv?.peerId]);
 
+  // Мой Premium — премиум-пользователи могут писать даже в «закрытую личку».
+  const [myPremium, setMyPremium] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetchMyPremium().then((p) => {
+      if (alive) setMyPremium(p.active);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   if (!conv) {
     return (
       <div className="flex h-full flex-1 flex-col items-center justify-center gap-3 bg-background">
@@ -221,6 +236,10 @@ export default function ChatPage({
   const typingNames = typing.typers.map((t) => t.name).join(", ");
   const iBlockedPeer = !!conv.blocked; // я заблокировал собеседника
   const peerBlockedMe = !!conv.peerBlockedMe; // собеседник заблокировал меня
+  // Собеседник закрыл личку (премиум-функция). Писать ему могут только
+  // пользователи с активным Premium.
+  const peerDmLocked =
+    isPrivate && !conv.saved && !!peerProfile?.dmClosed && !myPremium;
   // Скрываем аватар/статус собеседника, только если ОН заблокировал меня.
   const peerOnline = !peerBlockedMe && (conv.online || isOnline(conv.peerId));
   // Реальная активность собеседника — время его последнего сообщения в чате.
@@ -1207,12 +1226,41 @@ export default function ChatPage({
         </div>
       )}
 
+      {/* Собеседник закрыл личку (премиум-функция): красивое окно вместо поля */}
+      {peerDmLocked && !peerBlockedMe && !iBlockedPeer && !selectMode && (
+        <div className="border-t border-separator bg-surface px-4 pb-[max(env(safe-area-inset-bottom),16px)] pt-4">
+          <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-[var(--radius-card)] bg-surface-2 px-5 py-5 text-center">
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-press text-white shadow-md shadow-accent/25">
+              <LockKey size={28} weight="fill" />
+            </span>
+            <div>
+              <p className="text-[16px] font-semibold text-foreground">
+                {(peerProfile?.name || conv.title)} закрыл(а) личные сообщения
+              </p>
+              <p className="mt-1 text-[13px] leading-relaxed text-muted">
+                Писать этому пользователю могут только участники с HouseGram
+                Premium. Оформите Premium, чтобы отправить сообщение.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => router.push("/settings/premium")}
+              className="mt-1 flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-accent to-accent-press px-6 py-3 text-[15px] font-bold text-white shadow-lg shadow-accent/30 transition active:scale-[0.98]"
+            >
+              <Star size={18} weight="fill" />
+              Оформить Premium
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Поле ввода */}
       {!selectMode &&
         (!isSubscribedChannel || canPostChannel) &&
         !notJoined &&
         !iBlockedPeer &&
-        !peerBlockedMe && (
+        !peerBlockedMe &&
+        !peerDmLocked && (
         <div className="border-t border-separator bg-surface px-2 pb-[max(env(safe-area-inset-bottom),8px)] pt-1.5">
           {/* Баннер ответа / редактирования */}
           <AnimatePresence>
