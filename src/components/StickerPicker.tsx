@@ -36,6 +36,22 @@ export function StickerPicker({ open, onPick, onEmoji }: StickerPickerProps) {
   const settings = useSettings();
   const [tab, setTab] = useState<Tab>("stickers");
   const [query, setQuery] = useState("");
+  // Активная категория (для подсветки при прокрутке/переключении).
+  const [activeSet, setActiveSet] = useState<string>("");
+
+  // Определяет, какой набор сейчас вверху видимой области (scroll-spy).
+  const updateActiveSet = () => {
+    const container = document.getElementById("pk-scroll");
+    if (!container) return;
+    const top = container.getBoundingClientRect().top;
+    let current = "";
+    for (const set of sets) {
+      const el = document.getElementById(`pk-set-${set.id}`);
+      if (!el) continue;
+      if (el.getBoundingClientRect().top - top <= 56) current = set.id;
+    }
+    setActiveSet(current);
+  };
 
   // Премиум-статус — для разблокировки премиум-наборов стикеров.
   const [isPremium, setIsPremium] = useState(false);
@@ -95,13 +111,19 @@ export function StickerPicker({ open, onPick, onEmoji }: StickerPickerProps) {
                   aria-label="К началу"
                   onClick={() => {
                     setTab("stickers");
+                    setActiveSet("");
                     requestAnimationFrame(() => {
                       document
                         .getElementById("pk-scroll")
                         ?.scrollTo({ top: 0, behavior: "smooth" });
                     });
                   }}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-accent transition active:scale-90"
+                  className={cn(
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-accent transition active:scale-90 focus:outline-none",
+                    activeSet === ""
+                      ? "bg-surface-2 ring-2 ring-accent"
+                      : "hover:bg-surface-2"
+                  )}
                 >
                   <ClockCounterClockwise size={20} weight="regular" />
                 </button>
@@ -112,13 +134,19 @@ export function StickerPicker({ open, onPick, onEmoji }: StickerPickerProps) {
                     aria-label={set.title}
                     onClick={() => {
                       setTab("stickers");
+                      setActiveSet(set.id);
                       requestAnimationFrame(() => {
                         document
                           .getElementById(`pk-set-${set.id}`)
                           ?.scrollIntoView({ behavior: "smooth", block: "start" });
                       });
                     }}
-                    className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition hover:bg-surface-2 active:scale-90"
+                    className={cn(
+                      "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition active:scale-90 focus:outline-none",
+                      activeSet === set.id
+                        ? "bg-surface-2 ring-2 ring-accent"
+                        : "hover:bg-surface-2"
+                    )}
                   >
                     <StickerImage sticker={set.stickers[0]} size={26} />
                     {set.premium && (
@@ -166,7 +194,11 @@ export function StickerPicker({ open, onPick, onEmoji }: StickerPickerProps) {
               </div>
 
               {/* Стикеры */}
-              <div id="pk-scroll" className="no-scrollbar flex-1 overflow-y-auto px-3 py-2">
+              <div
+                id="pk-scroll"
+                onScroll={updateActiveSet}
+                className="no-scrollbar flex-1 overflow-y-auto px-3 py-2"
+              >
                 {recentStickers.length > 0 && (
                   <>
                     <SectionLabel>Недавние</SectionLabel>
