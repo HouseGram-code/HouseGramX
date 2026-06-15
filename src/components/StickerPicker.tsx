@@ -19,6 +19,7 @@ import { StickerImage } from "@/components/StickerImage";
 import { useStickers, type Sticker } from "@/lib/stickers-store";
 import { useSettings } from "@/lib/settings-store";
 import { fetchMyPremium } from "@/lib/premium";
+import { useToast } from "@/components/Toast";
 import { cn } from "@/lib/utils";
 
 type Tab = "stickers" | "emoji";
@@ -27,13 +28,24 @@ interface StickerPickerProps {
   open: boolean;
   onPick: (sticker: Sticker) => void;
   onEmoji?: (emoji: string) => void;
+  /**
+   * Разрешить премиум-стикеры без подписки (например, в «Избранном» —
+   * там можно отправлять их себе бесплатно).
+   */
+  allowPremium?: boolean;
 }
 
 /** Панель ввода: вкладки «Стикеры / Эмодзи» (Telegram-стиль через emoji-picker-react). */
-export function StickerPicker({ open, onPick, onEmoji }: StickerPickerProps) {
+export function StickerPicker({
+  open,
+  onPick,
+  onEmoji,
+  allowPremium = false,
+}: StickerPickerProps) {
   const router = useRouter();
   const { sets, recent, getSticker } = useStickers();
   const settings = useSettings();
+  const { show } = useToast();
   const [tab, setTab] = useState<Tab>("stickers");
   const [query, setQuery] = useState("");
   // Активная категория (для подсветки при прокрутке/переключении).
@@ -220,7 +232,7 @@ export function StickerPicker({ open, onPick, onEmoji }: StickerPickerProps) {
                       )
                     : set.stickers;
                   if (list.length === 0) return null;
-                  const locked = !!set.premium && !isPremium;
+                  const locked = !!set.premium && !isPremium && !allowPremium;
                   return (
                     <div key={set.id} id={`pk-set-${set.id}`} className="mb-3">
                       <SectionLabel>
@@ -236,7 +248,7 @@ export function StickerPicker({ open, onPick, onEmoji }: StickerPickerProps) {
                               )}
                             >
                               <Key size={10} weight="fill" />
-                              {locked ? "Premium" : "Открыт"}
+                              {locked ? "Premium" : allowPremium ? "Бесплатно" : "Открыт"}
                             </span>
                           )}
                         </span>
@@ -248,7 +260,12 @@ export function StickerPicker({ open, onPick, onEmoji }: StickerPickerProps) {
                             sticker={s}
                             locked={locked}
                             onPick={onPick}
-                            onLocked={() => router.push("/settings/premium")}
+                            onLocked={() => {
+                              show(
+                                "Стикер доступен только с HouseGram Premium"
+                              );
+                              router.push("/settings/premium");
+                            }}
                           />
                         ))}
                       </div>

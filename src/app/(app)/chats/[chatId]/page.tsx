@@ -59,7 +59,7 @@ import { fetchMyPremium } from "@/lib/premium";
 import { useGroupCall, useCallWatch } from "@/lib/group-call";
 import { useChatTyping } from "@/lib/typing";
 import { useSettings } from "@/lib/settings-store";
-import { useStickers, type StickerSet } from "@/lib/stickers-store";
+import { useStickers, type StickerSet, isPremiumStickerSrc } from "@/lib/stickers-store";
 import { useProfile } from "@/lib/profile-store";
 import { usePresence, useLastSeen } from "@/lib/presence-store";
 import { setActiveChat } from "@/lib/notify";
@@ -1114,14 +1114,25 @@ export default function ChatPage({
         excludeId={conv.id}
         onClose={() => setForwardId(null)}
         onPick={(toId) => {
-          if (forwardId === "__multi__") {
-            Array.from(selected).forEach((mid) =>
-              forwardMessage(conv.id, mid, toId)
-            );
-            exitSelect();
-          } else if (forwardId) {
-            forwardMessage(conv.id, forwardId, toId);
+          // Премиум-стикеры нельзя пересылать без активной подписки.
+          const isPremiumMsg = (mid: string) => {
+            const m = conv.messages.find((x) => x.id === mid);
+            return m?.kind === "sticker" && isPremiumStickerSrc(m.stickerSrc);
+          };
+          const ids =
+            forwardId === "__multi__"
+              ? Array.from(selected)
+              : forwardId
+                ? [forwardId]
+                : [];
+          if (!myPremium && ids.some(isPremiumMsg)) {
+            setForwardId(null);
+            if (forwardId === "__multi__") exitSelect();
+            show("Премиум-стикеры нельзя пересылать без HouseGram Premium");
+            return;
           }
+          ids.forEach((mid) => forwardMessage(conv.id, mid, toId));
+          if (forwardId === "__multi__") exitSelect();
           setForwardId(null);
           show("Переслано");
         }}
@@ -1168,6 +1179,7 @@ export default function ChatPage({
         !peerBlockedMe && (
         <StickerPicker
           open={pickerOpen}
+          allowPremium={conv.saved || myPremium}
           onPick={(st) => handlePickSticker(st.src, st.emoji, st.id)}
           onEmoji={(e) => {
             setDraft((d) => d + e);

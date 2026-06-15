@@ -70,7 +70,7 @@ const GIFTS_8MARCH: StickerSet = {
 // Премиум-набор «Короны» — доступен только обладателям HouseGram Premium.
 const PREMIUM_CROWNS: StickerSet = {
   id: "premium-crowns",
-  title: "Premium · Короны",
+  title: "Premium стикеры",
   cover: "/premium/redcrown.gif",
   premium: true,
   stickers: [
@@ -79,6 +79,24 @@ const PREMIUM_CROWNS: StickerSet = {
       src: "/premium/redcrown.gif",
       emoji: "👑",
       name: "корона",
+    },
+    {
+      id: "pc-booster",
+      src: "/premium/booster.png",
+      emoji: "🚀",
+      name: "бустер",
+    },
+    {
+      id: "pc-moon",
+      src: "/premium/moon.png",
+      emoji: "🌙",
+      name: "луна",
+    },
+    {
+      id: "pc-stars",
+      src: "/premium/stars.png",
+      emoji: "✨",
+      name: "звёзды",
     },
   ],
 };
@@ -284,4 +302,9 @@ export function useStickers() {
   const ctx = useContext(StickersContext);
   if (!ctx) throw new Error("useStickers должен быть внутри StickersProvider");
   return ctx;
+}
+
+/** Является ли стикер премиальным (по пути в /premium/). */
+export function isPremiumStickerSrc(src?: string): boolean {
+  return !!src && src.startsWith("/premium/");
 }
