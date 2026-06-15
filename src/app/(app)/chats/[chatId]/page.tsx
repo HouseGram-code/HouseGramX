@@ -32,6 +32,7 @@ import {
 import { Avatar } from "@/components/Avatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { BugHunterBadge } from "@/components/BugHunterBadge";
+import { PremiumBadge } from "@/components/PremiumBadge";
 import { MessageBubble } from "@/components/MessageBubble";
 import { ChannelPost } from "@/components/ChannelPost";
 import { StickerPicker } from "@/components/StickerPicker";
@@ -269,6 +270,7 @@ export default function ChatPage({
   const headerOfficial =
     conv.peerOfficial || !!peerProfile?.official || (isBot && conv.verified);
   const headerBadge = peerProfile?.badge || conv.peerBadge;
+  const headerPremium = isPrivate && !conv.saved && !!peerProfile?.premium;
   // Канал/группа, в которые вы ещё не вступили (открыты по ссылке)
   const notJoined =
     (isChannel || isGroup) && conv.isOwner !== true && conv.joined === false;
@@ -582,6 +584,7 @@ export default function ChatPage({
                   <VerifiedBadge size={16} />
                 )}
                 {headerBadge && <BugHunterBadge size={16} />}
+                {headerPremium && <PremiumBadge name={headerTitle} size={16} />}
               </p>
               <p className="truncate text-[12px]">
                 {isChannel ? (

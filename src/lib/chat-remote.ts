@@ -794,12 +794,13 @@ export async function loadUserProfileByUsername(
   try {
     const { data } = await getSupabase()
       .from("profiles")
-      .select("id, name, username, avatar, color, bio, last_seen, official, badge")
+      .select("id, name, username, avatar, color, bio, last_seen, official, badge, premium_until, dm_closed")
       .ilike("username", u)
       .maybeSingle();
     if (!data) return null;
     const p = data as ProfileRow;
     const name = p.name || "Пользователь";
+    const premium = premiumActive(p.premium_until);
     return {
       id: p.id,
       name,
@@ -811,6 +812,8 @@ export async function loadUserProfileByUsername(
       initials: initialsOf(name),
       official: !!p.official,
       badge: p.badge || "",
+      premium,
+      dmClosed: premium && !!p.dm_closed,
     };
   } catch (e) {
     console.warn("[chat-remote] loadUserProfileByUsername:", e);

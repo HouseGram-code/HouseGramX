@@ -17,12 +17,14 @@ import {
 } from "@phosphor-icons/react";
 import { Avatar } from "@/components/Avatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { PremiumBadge } from "@/components/PremiumBadge";
 import { Group, GroupHint, NavRow, SectionTitle } from "@/components/settings-ui";
 import { useSettings } from "@/lib/settings-store";
 import { useProfile } from "@/lib/profile-store";
 import { useAuth } from "@/lib/auth-store";
 import { isAdminEmail } from "@/lib/admin";
-import { useState } from "react";
+import { fetchMyPremium } from "@/lib/premium";
+import { useEffect, useState } from "react";
 import { SignOut, ShieldStar } from "@phosphor-icons/react";
 import { FolderSimple, Translate, Database } from "@phosphor-icons/react";
 import { useT, type TKey } from "@/lib/i18n";
@@ -49,6 +51,18 @@ export default function SettingsPage() {
   const { user, configured, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
   const isAdmin = isAdminEmail(user?.email);
+
+  // Свой Premium-статус — для звезды рядом с именем.
+  const [myPremium, setMyPremium] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetchMyPremium().then((p) => {
+      if (alive) setMyPremium(p.active);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   return (
     <div className="no-scrollbar flex-1 overflow-y-auto bg-background">
@@ -91,6 +105,7 @@ export default function SettingsPage() {
         <h1 className="mt-3 flex items-center justify-center gap-1.5 text-[22px] font-bold text-foreground">
           {profile.name}
           {isAdmin && <VerifiedBadge size={20} />}
+          {myPremium && <PremiumBadge name={profile.name} size={20} />}
         </h1>
         <p className="mt-0.5 text-[14px] text-muted">
           {profile.username ? `@${profile.username}` : t("setUsername")}

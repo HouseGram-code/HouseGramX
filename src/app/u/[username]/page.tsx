@@ -7,6 +7,7 @@ import { ChatCircle, At, Bug } from "@phosphor-icons/react";
 import { Avatar } from "@/components/Avatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { BugHunterBadge } from "@/components/BugHunterBadge";
+import { PremiumBadge } from "@/components/PremiumBadge";
 import { useProfile } from "@/lib/profile-store";
 import { loadUserProfileByUsername, type UserProfile } from "@/lib/chat-remote";
 import { badgeMeta } from "@/lib/badges";
@@ -77,6 +78,7 @@ export default function PublicProfilePage({
         <span>{name}</span>
         {official && <VerifiedBadge size={22} />}
         {meta && <BugHunterBadge size={22} title={meta.description} />}
+        {remote?.premium && <PremiumBadge name={name} size={22} />}
       </h1>
 
       {handle && (

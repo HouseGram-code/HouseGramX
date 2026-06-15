@@ -24,6 +24,7 @@ import {
 import { Avatar } from "@/components/Avatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { BugHunterBadge } from "@/components/BugHunterBadge";
+import { PremiumBadge } from "@/components/PremiumBadge";
 import { badgeMeta } from "@/lib/badges";
 import { useChats } from "@/lib/chat-store";
 import { usePresence, useLastSeen } from "@/lib/presence-store";
@@ -188,6 +189,7 @@ export default function ChatInfoPage({
             {isBot && <Robot size={20} weight="fill" className="text-accent" />}
             {(peer?.official || conv.peerOfficial) && <VerifiedBadge size={20} />}
             {badge && <BugHunterBadge size={20} />}
+            {peer?.premium && <PremiumBadge name={title} size={20} />}
             {conv.verified && !peer?.official && (
               <span className="text-accent">✓</span>
             )}
