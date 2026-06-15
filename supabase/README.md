@@ -76,7 +76,7 @@ SUPABASE_SERVICE_ROLE_KEY=sb_secret_...   # только сервер, в кли
 4. `supabase/premium.sql` — **HouseGram Premium** и «Закрытая личка».
 
 После `premium.sql` появятся:
-- колонки `profiles.premium_until` и `profiles.dm_closed`;
+- колонки `profiles.premium_until`, `profiles.dm_closed` и `profiles.premium_status`;
 - RPC `admin_grant_premium(_username, _days)` и `admin_revoke_premium(_username)`
   (только для админа `goh@gmail.com`) — используются в админ-панели для выдачи
   Premium по username на N дней;

@@ -189,7 +189,13 @@ export default function ChatInfoPage({
             {isBot && <Robot size={20} weight="fill" className="text-accent" />}
             {(peer?.official || conv.peerOfficial) && <VerifiedBadge size={20} />}
             {badge && <BugHunterBadge size={20} />}
-            {peer?.premium && <PremiumBadge name={title} size={20} />}
+            {peer?.premium && (
+              <PremiumBadge
+                name={title}
+                size={22}
+                status={peer?.premiumStatus}
+              />
+            )}
             {conv.verified && !peer?.official && (
               <span className="text-accent">✓</span>
             )}

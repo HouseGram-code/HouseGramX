@@ -584,7 +584,13 @@ export default function ChatPage({
                   <VerifiedBadge size={16} />
                 )}
                 {headerBadge && <BugHunterBadge size={16} />}
-                {headerPremium && <PremiumBadge name={headerTitle} size={16} />}
+                {headerPremium && (
+                  <PremiumBadge
+                    name={headerTitle}
+                    size={16}
+                    status={peerProfile?.premiumStatus}
+                  />
+                )}
               </p>
               <p className="truncate text-[12px]">
                 {isChannel ? (

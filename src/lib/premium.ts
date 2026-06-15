@@ -11,12 +11,15 @@ export interface MyPremium {
   active: boolean;
   /** Пользователь закрыл личку (премиум-функция). */
   dmClosed: boolean;
+  /** Выбранный эмодзи-статус (id из каталога) или "". */
+  status: string;
 }
 
 const EMPTY: MyPremium = {
   premiumUntil: null,
   active: false,
   dmClosed: false,
+  status: "",
 };
 
 /** Загружает Premium-статус текущего пользователя из Supabase. */
@@ -27,7 +30,7 @@ export async function fetchMyPremium(): Promise<MyPremium> {
   try {
     const { data, error } = await getSupabase()
       .from("profiles")
-      .select("premium_until, dm_closed")
+      .select("premium_until, dm_closed, premium_status")
       .eq("id", uid)
       .maybeSingle();
     if (error || !data) return EMPTY;
@@ -36,6 +39,7 @@ export async function fetchMyPremium(): Promise<MyPremium> {
       premiumUntil: until,
       active: until ? new Date(until).getTime() > Date.now() : false,
       dmClosed: !!data.dm_closed,
+      status: (data.premium_status as string | null) ?? "",
     };
   } catch {
     return EMPTY;
@@ -50,6 +54,18 @@ export async function setDmClosed(closed: boolean): Promise<void> {
   const { error } = await getSupabase()
     .from("profiles")
     .update({ dm_closed: closed, updated_at: new Date().toISOString() })
+    .eq("id", uid);
+  if (error) throw new Error(error.message);
+}
+
+/** Устанавливает эмодзи-статус Premium (id из каталога; "" — снять). */
+export async function setPremiumStatus(statusId: string): Promise<void> {
+  if (!isSupabaseConfigured) throw new Error("Сервис недоступен");
+  const uid = getSyncUser();
+  if (!uid) throw new Error("Нужен вход в аккаунт");
+  const { error } = await getSupabase()
+    .from("profiles")
+    .update({ premium_status: statusId, updated_at: new Date().toISOString() })
     .eq("id", uid);
   if (error) throw new Error(error.message);
 }

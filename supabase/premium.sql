@@ -18,6 +18,10 @@ alter table public.profiles
 alter table public.profiles
   add column if not exists dm_closed boolean not null default false;
 
+-- Эмодзи-статус Premium (id из каталога премиум-статусов, '' = нет).
+alter table public.profiles
+  add column if not exists premium_status text not null default '';
+
 -- ────────────────────────────────────────────────────────────────────────────
 -- 2) Активен ли Premium у пользователя
 -- ────────────────────────────────────────────────────────────────────────────

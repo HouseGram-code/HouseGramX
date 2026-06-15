@@ -23,7 +23,7 @@ import { useSettings } from "@/lib/settings-store";
 import { useProfile } from "@/lib/profile-store";
 import { useAuth } from "@/lib/auth-store";
 import { isAdminEmail } from "@/lib/admin";
-import { fetchMyPremium } from "@/lib/premium";
+import { fetchMyPremium, type MyPremium } from "@/lib/premium";
 import { useEffect, useState } from "react";
 import { SignOut, ShieldStar } from "@phosphor-icons/react";
 import { FolderSimple, Translate, Database } from "@phosphor-icons/react";
@@ -52,12 +52,12 @@ export default function SettingsPage() {
   const [signingOut, setSigningOut] = useState(false);
   const isAdmin = isAdminEmail(user?.email);
 
-  // Свой Premium-статус — для звезды рядом с именем.
-  const [myPremium, setMyPremium] = useState(false);
+  // Свой Premium-статус — для звезды/статуса рядом с именем.
+  const [myPremium, setMyPremium] = useState<MyPremium | null>(null);
   useEffect(() => {
     let alive = true;
     fetchMyPremium().then((p) => {
-      if (alive) setMyPremium(p.active);
+      if (alive) setMyPremium(p);
     });
     return () => {
       alive = false;
@@ -105,7 +105,17 @@ export default function SettingsPage() {
         <h1 className="mt-3 flex items-center justify-center gap-1.5 text-[22px] font-bold text-foreground">
           {profile.name}
           {isAdmin && <VerifiedBadge size={20} />}
-          {myPremium && <PremiumBadge name={profile.name} size={20} />}
+          {myPremium?.active && (
+            <PremiumBadge
+              name={profile.name}
+              size={22}
+              editable
+              status={myPremium.status}
+              onStatusChange={(id) =>
+                setMyPremium((p) => (p ? { ...p, status: id } : p))
+              }
+            />
+          )}
         </h1>
         <p className="mt-0.5 text-[14px] text-muted">
           {profile.username ? `@${profile.username}` : t("setUsername")}

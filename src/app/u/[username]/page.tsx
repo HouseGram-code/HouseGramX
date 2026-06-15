@@ -78,7 +78,9 @@ export default function PublicProfilePage({
         <span>{name}</span>
         {official && <VerifiedBadge size={22} />}
         {meta && <BugHunterBadge size={22} title={meta.description} />}
-        {remote?.premium && <PremiumBadge name={name} size={22} />}
+        {remote?.premium && (
+          <PremiumBadge name={name} size={24} status={remote?.premiumStatus} />
+        )}
       </h1>
 
       {handle && (

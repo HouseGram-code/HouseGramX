@@ -82,6 +82,7 @@ export interface ProfileRow {
   badge?: string | null;
   premium_until?: string | null;
   dm_closed?: boolean | null;
+  premium_status?: string | null;
 }
 
 /** Найденный пользователь (для поиска и старта чата). */
@@ -742,6 +743,8 @@ export interface UserProfile {
   premium?: boolean;
   /** Пользователь закрыл личку И его Premium активен (нельзя писать). */
   dmClosed?: boolean;
+  /** Эмодзи-статус Premium (id из каталога), если активен. */
+  premiumStatus?: string;
 }
 
 /** Активен ли Premium по ISO-дате окончания. */
@@ -757,7 +760,7 @@ export async function loadUserProfile(
   try {
     const { data } = await getSupabase()
       .from("profiles")
-      .select("id, name, username, avatar, color, bio, last_seen, official, badge, premium_until, dm_closed")
+      .select("id, name, username, avatar, color, bio, last_seen, official, badge, premium_until, dm_closed, premium_status")
       .eq("id", userId)
       .maybeSingle();
     if (!data) return null;
@@ -777,6 +780,7 @@ export async function loadUserProfile(
       badge: p.badge || "",
       premium,
       dmClosed: premium && !!p.dm_closed,
+      premiumStatus: premium ? p.premium_status || "" : "",
     };
   } catch (e) {
     console.warn("[chat-remote] loadUserProfile:", e);
@@ -794,7 +798,7 @@ export async function loadUserProfileByUsername(
   try {
     const { data } = await getSupabase()
       .from("profiles")
-      .select("id, name, username, avatar, color, bio, last_seen, official, badge, premium_until, dm_closed")
+      .select("id, name, username, avatar, color, bio, last_seen, official, badge, premium_until, dm_closed, premium_status")
       .ilike("username", u)
       .maybeSingle();
     if (!data) return null;
@@ -814,6 +818,7 @@ export async function loadUserProfileByUsername(
       badge: p.badge || "",
       premium,
       dmClosed: premium && !!p.dm_closed,
+      premiumStatus: premium ? p.premium_status || "" : "",
     };
   } catch (e) {
     console.warn("[chat-remote] loadUserProfileByUsername:", e);
