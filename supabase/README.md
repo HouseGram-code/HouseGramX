@@ -66,6 +66,23 @@ SUPABASE_SERVICE_ROLE_KEY=sb_secret_...   # только сервер, в кли
 Скрипт идемпотентен (можно запускать повторно): создаёт таблицы, политики RLS,
 вспомогательные функции и включает realtime.
 
+### Порядок выполнения SQL-скриптов
+
+Запустите по очереди (каждый идемпотентен, можно повторять):
+
+1. `supabase/schema.sql` — базовые таблицы, RLS, realtime.
+2. `supabase/admin.sql` — админ-панель, бан-система, статистика.
+3. `supabase/badge.sql` — бейдж «Багхантер».
+4. `supabase/premium.sql` — **HouseGram Premium** и «Закрытая личка».
+
+После `premium.sql` появятся:
+- колонки `profiles.premium_until` и `profiles.dm_closed`;
+- RPC `admin_grant_premium(_username, _days)` и `admin_revoke_premium(_username)`
+  (только для админа `goh@gmail.com`) — используются в админ-панели для выдачи
+  Premium по username на N дней;
+- правило: пока у пользователя активен Premium и включена «Закрытая личка»,
+  ему нельзя написать в личные сообщения (проверка в политике `messages_insert`).
+
 ### Подтверждение e-mail (по желанию, для удобного теста)
 
 **Authentication → Sign In / Providers → Email →** выключите **Confirm email**,

@@ -1,52 +1,31 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, useSpring } from "motion/react";
 import {
-  Check,
   Sparkle,
-  Smiley,
-  FolderSimple,
-  CloudArrowUp,
-  ShieldCheck,
-  Confetti,
+  LockKey,
+  PaperPlaneTilt,
+  CheckCircle,
 } from "@phosphor-icons/react";
 import { SubScreen } from "@/components/SubScreen";
+import { Switch } from "@/components/Switch";
+import { useToast } from "@/components/Toast";
+import {
+  fetchMyPremium,
+  setDmClosed,
+  formatPremiumUntil,
+  type MyPremium,
+} from "@/lib/premium";
 
 /** Ссылка на реальную оплату (DonatePay). */
 const DONATE_URL = "https://donatepay.ru/don/1506094";
+/** Бот техподдержки для активации Premium после оплаты. */
+const SUPPORT_BOT_URL = "https://t.me/HouseGramBot";
 
 /** Путь пятиконечной звезды (viewBox 0 0 100 100). */
 const STAR_PATH =
   "M50 3 L63.5 37.5 L100 39.5 L71 63 L80.5 98 L50 78 L19.5 98 L29 63 L0 39.5 L36.5 37.5 Z";
-
-const features: { icon: typeof Sparkle; title: string; desc: string }[] = [
-  {
-    icon: Smiley,
-    title: "Анимированные эмодзи",
-    desc: "Премиум-эмодзи и уникальные реакции в чатах",
-  },
-  {
-    icon: FolderSimple,
-    title: "Больше папок и стикеров",
-    desc: "Расширенные лимиты на папки, чаты и наборы стикеров",
-  },
-  {
-    icon: CloudArrowUp,
-    title: "Файлы до 4 ГБ",
-    desc: "Отправляйте большие файлы и медиа без сжатия",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Значок Premium",
-    desc: "Особый значок у имени и приоритетная поддержка",
-  },
-  {
-    icon: Confetti,
-    title: "Без рекламы",
-    desc: "Чистый интерфейс и эксклюзивное оформление",
-  },
-];
 
 /** Интерактивная 3D-звезда: вращается перетаскиванием (как в Telegram). */
 function PremiumStar() {
@@ -72,15 +51,13 @@ function PremiumStar() {
     dragging.current = false;
   };
 
-  // Слои для эффекта объёма (экструзия по оси Z).
   const layers = 12;
 
   return (
     <div
-      className="flex items-center justify-center py-2 select-none"
+      className="flex select-none items-center justify-center py-2"
       style={{ perspective: 900 }}
     >
-      {/* Свечение под звездой */}
       <div className="relative">
         <div className="pointer-events-none absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/30 blur-3xl" />
         <motion.div
@@ -126,10 +103,7 @@ function PremiumStar() {
                     </linearGradient>
                   </defs>
                 )}
-                <path
-                  d={STAR_PATH}
-                  fill={top ? "url(#starGrad)" : "#a31616"}
-                />
+                <path d={STAR_PATH} fill={top ? "url(#starGrad)" : "#a31616"} />
                 {top && <path d={STAR_PATH} fill="url(#starShine)" />}
               </svg>
             );
@@ -141,6 +115,43 @@ function PremiumStar() {
 }
 
 export default function PremiumPage() {
+  const { show } = useToast();
+  const [premium, setPremium] = useState<MyPremium | null>(null);
+  const [savingDm, setSavingDm] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    fetchMyPremium().then((p) => {
+      if (alive) setPremium(p);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const active = premium?.active ?? false;
+  const dmClosed = premium?.dmClosed ?? false;
+
+  const onToggleDm = async (next: boolean) => {
+    if (!active) {
+      show("Доступно с Premium");
+      return;
+    }
+    setSavingDm(true);
+    // Оптимистично обновляем UI.
+    setPremium((p) => (p ? { ...p, dmClosed: next } : p));
+    try {
+      await setDmClosed(next);
+      show(next ? "Личка закрыта" : "Личка открыта");
+    } catch (e) {
+      // Откат при ошибке.
+      setPremium((p) => (p ? { ...p, dmClosed: !next } : p));
+      show(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setSavingDm(false);
+    }
+  };
+
   return (
     <SubScreen title="HouseGram Premium">
       <div className="flex flex-col px-4 pt-6">
@@ -149,44 +160,52 @@ export default function PremiumPage() {
         <h1 className="mt-4 text-center text-[26px] font-extrabold tracking-tight text-foreground">
           HouseGram Premium
         </h1>
-        <p className="mx-auto mt-1.5 max-w-xs text-center text-[14px] leading-relaxed text-muted">
-          Покрутите звезду пальцем или мышью. Откройте эксклюзивные
-          возможности и поддержите проект.
-        </p>
 
-        {/* Список преимуществ */}
+        {/* Статус подписки */}
+        {active ? (
+          <div className="mx-auto mt-3 flex items-center gap-2 rounded-full bg-green-500/15 px-4 py-1.5">
+            <CheckCircle size={18} weight="fill" className="text-green-600" />
+            <span className="text-[14px] font-semibold text-green-600">
+              Активен до {formatPremiumUntil(premium?.premiumUntil ?? null)}
+            </span>
+          </div>
+        ) : (
+          <p className="mx-auto mt-1.5 max-w-xs text-center text-[14px] leading-relaxed text-muted">
+            Покрутите звезду пальцем или мышью. Откройте эксклюзивные
+            возможности и поддержите проект.
+          </p>
+        )}
+
+        {/* Премиум-функция: закрытая личка */}
         <div className="mt-6 overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-          {features.map((f, i) => {
-            const Icon = f.icon;
-            return (
-              <motion.div
-                key={f.title}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.05, duration: 0.25 }}
-                className={`flex items-center gap-3 px-4 py-3 ${
-                  i < features.length - 1 ? "border-b border-separator" : ""
-                }`}
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-press text-white shadow-sm">
-                  <Icon size={22} weight="fill" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] font-semibold text-foreground">
-                    {f.title}
-                  </span>
-                  <span className="block text-[13px] leading-snug text-muted">
-                    {f.desc}
-                  </span>
-                </span>
-                <Check size={18} weight="bold" className="shrink-0 text-accent" />
-              </motion.div>
-            );
-          })}
+          <div className="flex items-center gap-3 px-4 py-3.5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-press text-white shadow-sm">
+              <LockKey size={22} weight="fill" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[15px] font-semibold text-foreground">
+                Закрыть личку
+              </p>
+              <p className="text-[13px] leading-snug text-muted">
+                Пока включено, никто не сможет написать вам в личные сообщения
+              </p>
+            </div>
+            <Switch
+              checked={dmClosed}
+              onChange={onToggleDm}
+              disabled={savingDm || !active}
+              label="Закрыть личку"
+            />
+          </div>
         </div>
+        {!active && (
+          <p className="px-2 pt-2 text-[12px] leading-relaxed text-muted">
+            «Закрытая личка» доступна только с активным Premium.
+          </p>
+        )}
 
         {/* Цена */}
-        <div className="mt-5 flex items-end justify-center gap-1.5">
+        <div className="mt-6 flex items-end justify-center gap-1.5">
           <span className="text-[40px] font-extrabold leading-none text-foreground">
             200 ₽
           </span>
@@ -204,9 +223,28 @@ export default function PremiumPage() {
           Купить премиум — 200 ₽
         </a>
 
-        <p className="mx-auto mt-3 max-w-xs text-center text-[12px] leading-relaxed text-muted">
-          Оплата проходит на защищённой странице DonatePay. После оплаты
-          premium активируется на 1 месяц.
+        {/* Инструкция: после оплаты написать боту техподдержки */}
+        <div className="mt-4 rounded-[var(--radius-card)] bg-surface p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+          <p className="text-[14px] font-semibold text-foreground">
+            После оплаты
+          </p>
+          <p className="mt-1 text-[13px] leading-relaxed text-muted">
+            Отправьте боту техподдержки скриншот перевода — и мы активируем вам
+            Premium вручную.
+          </p>
+          <a
+            href={SUPPORT_BOT_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 flex items-center justify-center gap-2 rounded-2xl bg-surface-2 px-4 py-3 text-[15px] font-semibold text-accent transition active:scale-[0.98]"
+          >
+            <PaperPlaneTilt size={20} weight="fill" />
+            Написать @HouseGramBot
+          </a>
+        </div>
+
+        <p className="mx-auto mt-3 max-w-xs pb-2 text-center text-[12px] leading-relaxed text-muted">
+          Оплата проходит на защищённой странице DonatePay.
         </p>
       </div>
     </SubScreen>

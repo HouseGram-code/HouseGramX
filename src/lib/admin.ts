@@ -14,6 +14,7 @@ export interface AdminUser {
   bio: string;
   banned: boolean;
   badge: string;
+  premium_until: string | null;
   last_seen: string | null;
   updated_at: string;
 }
@@ -28,7 +29,7 @@ export async function fetchAllUsers(): Promise<AdminUser[]> {
   if (!isSupabaseConfigured) return [];
   const { data, error } = await getSupabase()
     .from("profiles")
-    .select("id, name, username, avatar, color, bio, banned, badge, last_seen, updated_at")
+    .select("id, name, username, avatar, color, bio, banned, badge, premium_until, last_seen, updated_at")
     .order("updated_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as AdminUser[];
@@ -77,11 +78,40 @@ export async function checkUsernameAvailable(username: string): Promise<boolean>
   }
 }
 
+/**
+ * Выдаёт Premium пользователю по username на указанное число дней (только админ).
+ * Если Premium ещё активен — продлевает. Возвращает ISO-дату окончания.
+ */
+export async function grantPremium(
+  username: string,
+  days: number
+): Promise<string> {
+  if (!isSupabaseConfigured) throw new Error("Сервис недоступен");
+  const { data, error } = await getSupabase().rpc("admin_grant_premium", {
+    _username: username.trim().replace(/^@/, ""),
+    _days: days,
+  });
+  if (error) throw new Error(translateAdminError(error.message));
+  const until = (data as { premium_until?: string } | null)?.premium_until;
+  return until ?? "";
+}
+
+/** Снимает Premium у пользователя по username (только админ). */
+export async function revokePremium(username: string): Promise<void> {
+  if (!isSupabaseConfigured) throw new Error("Сервис недоступен");
+  const { error } = await getSupabase().rpc("admin_revoke_premium", {
+    _username: username.trim().replace(/^@/, ""),
+  });
+  if (error) throw new Error(translateAdminError(error.message));
+}
+
 /** Переводит технические ошибки RPC в понятные сообщения. */
 function translateAdminError(message: string): string {
   const m = message.toLowerCase();
   if (m.includes("forbidden")) return "Недостаточно прав";
   if (m.includes("cannot ban self")) return "Нельзя забанить самого себя";
+  if (m.includes("user not found")) return "Пользователь не найден";
+  if (m.includes("invalid days")) return "Укажите корректное число дней";
   return message;
 }
 

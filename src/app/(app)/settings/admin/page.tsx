@@ -19,6 +19,7 @@ import {
   DownloadSimple,
   Wrench,
   SealCheck,
+  Star,
 } from "@phosphor-icons/react";
 import { SubScreen } from "@/components/SubScreen";
 import { Avatar } from "@/components/Avatar";
@@ -33,11 +34,14 @@ import {
   setBanned,
   setBadge,
   setMaintenance,
+  grantPremium,
+  revokePremium,
   usersToCsv,
   isAdminEmail,
   type AdminUser,
   type AdminStats,
 } from "@/lib/admin";
+import { formatPremiumUntil } from "@/lib/premium";
 import { formatLastSeen } from "@/lib/utils";
 
 type Filter = "all" | "active" | "banned";
@@ -60,6 +64,11 @@ export default function AdminPage() {
   // Состояние формы режима техработ.
   const [maintMsg, setMaintMsg] = useState("");
   const [maintBusy, setMaintBusy] = useState(false);
+
+  // Состояние формы выдачи Premium.
+  const [premUsername, setPremUsername] = useState("");
+  const [premDays, setPremDays] = useState("30");
+  const [premBusy, setPremBusy] = useState(false);
 
   const isAdmin = isAdminEmail(user?.email);
 
@@ -109,6 +118,66 @@ export default function AdminPage() {
       show(e instanceof Error ? e.message : "Ошибка");
     } finally {
       setMaintBusy(false);
+    }
+  };
+
+  const grantPrem = async () => {
+    const uname = premUsername.trim().replace(/^@/, "");
+    const days = parseInt(premDays, 10);
+    if (!uname) {
+      show("Введите username");
+      return;
+    }
+    if (!days || days <= 0) {
+      show("Укажите число дней");
+      return;
+    }
+    setPremBusy(true);
+    try {
+      const until = await grantPremium(uname, days);
+      // Обновляем строку в локальном списке, если пользователь загружен.
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.username.toLowerCase() === uname.toLowerCase()
+            ? { ...u, premium_until: until }
+            : u
+        )
+      );
+      show(
+        until
+          ? `Premium до ${formatPremiumUntil(until)}`
+          : "Premium выдан"
+      );
+      setPremUsername("");
+    } catch (e) {
+      show(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setPremBusy(false);
+    }
+  };
+
+  const revokePrem = async () => {
+    const uname = premUsername.trim().replace(/^@/, "");
+    if (!uname) {
+      show("Введите username");
+      return;
+    }
+    setPremBusy(true);
+    try {
+      await revokePremium(uname);
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.username.toLowerCase() === uname.toLowerCase()
+            ? { ...u, premium_until: null }
+            : u
+        )
+      );
+      show("Premium снят");
+      setPremUsername("");
+    } catch (e) {
+      show(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setPremBusy(false);
     }
   };
 
@@ -299,6 +368,77 @@ export default function AdminPage() {
           При включении все пользователи увидят экран-заглушку. Вы как
           администратор сохраните полный доступ к сайту.
         </p>
+      </div>
+
+      {/* Выдача HouseGram Premium */}
+      <div className="px-3 pt-4">
+        <div className="overflow-hidden rounded-[var(--radius-card)] bg-surface ring-1 ring-separator">
+          <div className="flex items-center gap-3 px-4 py-3.5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-press text-white">
+              <Star size={20} weight="fill" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[15px] font-semibold text-foreground">
+                Выдать Premium
+              </p>
+              <p className="text-[12px] text-muted">
+                По username на указанное число дней
+              </p>
+            </div>
+          </div>
+
+          <div className="border-t border-separator px-4 py-3">
+            <div className="flex items-center gap-2.5 rounded-xl bg-surface-2 px-3">
+              <At size={18} weight="bold" className="shrink-0 text-muted-2" />
+              <input
+                value={premUsername}
+                onChange={(e) => setPremUsername(e.target.value)}
+                placeholder="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                className="w-full bg-transparent py-2.5 text-[15px] text-foreground placeholder:text-muted-2 focus:outline-none"
+              />
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                value={premDays}
+                onChange={(e) =>
+                  setPremDays(e.target.value.replace(/[^0-9]/g, ""))
+                }
+                inputMode="numeric"
+                placeholder="Дней"
+                className="w-24 rounded-xl bg-surface-2 px-3 py-2.5 text-center text-[15px] text-foreground placeholder:text-muted-2 focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+              <span className="text-[13px] text-muted">дней</span>
+            </div>
+            <div className="mt-2.5 flex gap-2">
+              <button
+                type="button"
+                disabled={premBusy}
+                onClick={grantPrem}
+                className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-accent py-3 text-[15px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
+              >
+                {premBusy ? (
+                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <>
+                    <Star size={18} weight="fill" />
+                    Выдать
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                disabled={premBusy}
+                onClick={revokePrem}
+                className="flex items-center justify-center rounded-2xl bg-surface-2 px-4 py-3 text-[15px] font-semibold text-muted transition active:scale-[0.98] disabled:opacity-50"
+              >
+                Снять
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Статистика */}
