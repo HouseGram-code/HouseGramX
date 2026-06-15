@@ -13,6 +13,7 @@ import {
   BookmarkSimple,
   Moon,
   Info,
+  Star,
 } from "@phosphor-icons/react";
 import { Avatar } from "@/components/Avatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
@@ -111,6 +112,19 @@ export default function SettingsPage() {
             last
             index={0}
             onClick={() => router.push("/settings/invite")}
+          />
+        </Group>
+
+        {/* HouseGram Premium */}
+        <Group>
+          <NavRow
+            icon={Star}
+            iconBg="#FA3A3A"
+            label={t("premium")}
+            value="200 ₽/мес"
+            last
+            index={0}
+            onClick={() => router.push("/settings/premium")}
           />
         </Group>
 
