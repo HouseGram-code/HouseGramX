@@ -224,7 +224,7 @@ export default function SettingsPage() {
             icon={Info}
             iconBg="#8E8E93"
             label={t("about")}
-            value={`${"0.1.0"} beta`}
+            value={`${"0.2.0"} beta`}
             last
             index={9}
             onClick={() => router.push("/settings/about")}

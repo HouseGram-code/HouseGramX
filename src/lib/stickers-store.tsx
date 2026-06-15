@@ -30,6 +30,8 @@ export interface StickerSet {
   custom?: boolean;
   /** Автор набора (имя), если создан пользователем. */
   author?: string;
+  /** Премиум-набор — доступен только обладателям HouseGram Premium. */
+  premium?: boolean;
 }
 
 // Готовый набор «Подарки» (24 стикера) — Microsoft Fluent Emoji 3D (MIT).
@@ -65,7 +67,23 @@ const GIFTS_8MARCH: StickerSet = {
   ],
 };
 
-const DEFAULT_SETS: StickerSet[] = [GIFTS_8MARCH];
+// Премиум-набор «Короны» — доступен только обладателям HouseGram Premium.
+const PREMIUM_CROWNS: StickerSet = {
+  id: "premium-crowns",
+  title: "Premium · Короны",
+  cover: "/premium/redcrown.gif",
+  premium: true,
+  stickers: [
+    {
+      id: "pc-crown",
+      src: "/premium/redcrown.gif",
+      emoji: "👑",
+      name: "корона",
+    },
+  ],
+};
+
+const DEFAULT_SETS: StickerSet[] = [GIFTS_8MARCH, PREMIUM_CROWNS];
 
 interface StickersContextValue {
   /** Видимые наборы (дефолтные + пользовательские, без скрытых). */

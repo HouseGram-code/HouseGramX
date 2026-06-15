@@ -10,7 +10,7 @@ import {
 import { SubScreen } from "@/components/SubScreen";
 import { Group, GroupHint, SectionTitle } from "@/components/settings-ui";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 const STAGE = "beta";
 
 export default function AboutPage() {
