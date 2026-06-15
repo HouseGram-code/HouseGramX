@@ -128,3 +128,10 @@ body {
 .animate-sticker-emoji {
   animation: sticker-emoji-bounce 1.3s ease-in-out infinite;
 }
+
+/* Плейсхолдер для rich-поля ввода (contenteditable) */
+.rich-input:empty:before {
+  content: attr(data-placeholder);
+  color: var(--muted-2);
+  pointer-events: none;
+}

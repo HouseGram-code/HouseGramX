@@ -34,7 +34,7 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { BugHunterBadge } from "@/components/BugHunterBadge";
 import { PremiumBadge } from "@/components/PremiumBadge";
 import { MessageBubble } from "@/components/MessageBubble";
-import { RichText } from "@/components/RichText";
+import { RichInput } from "@/components/RichInput";
 import { ChannelPost } from "@/components/ChannelPost";
 import { StickerPicker } from "@/components/StickerPicker";
 import { StickerSetSheet } from "@/components/StickerSetSheet";
@@ -147,7 +147,7 @@ export default function ChatPage({
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = useRef<HTMLDivElement>(null);
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
 
   const conv = getConversation(chatId);
@@ -312,7 +312,6 @@ export default function ChatPage({
     }
     typing.stopTyping();
     setDraft("");
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
   };
 
   const handleSchedule = () => {
@@ -326,11 +325,10 @@ export default function ChatPage({
     setReplyTo(null);
     setDraft("");
     setSchedulePickerOpen(false);
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
     show("Сообщение запланировано");
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Escape") {
       setReplyTo(null);
       setEditing(null);
@@ -1348,18 +1346,6 @@ export default function ChatPage({
             )}
           </AnimatePresence>
 
-          {/* Живой предпросмотр премиум-эмодзи (в textarea картинки не видны) */}
-          {!recorder.recording && hasPremiumEmoji(draft) && (
-            <div className="mb-1.5 flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2">
-              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-muted">
-                Превью
-              </span>
-              <div className="min-w-0 flex-1 overflow-hidden">
-                <RichText text={draft} fontSize={15} />
-              </div>
-            </div>
-          )}
-
           {recorder.recording ? (
             <RecordingBar
               mode={recorder.mode}
@@ -1384,19 +1370,15 @@ export default function ChatPage({
                   )}
                 </button>
 
-                <textarea
-                  ref={textareaRef}
+                <RichInput
                   value={draft}
-                  onChange={(e) => {
-                    setDraft(e.target.value);
-                    if (e.target.value.trim()) typing.notifyTyping();
-                    e.target.style.height = "auto";
-                    e.target.style.height =
-                      Math.min(e.target.scrollHeight, 120) + "px";
+                  editableRef={textareaRef}
+                  onChange={(v) => {
+                    setDraft(v);
+                    if (v.trim()) typing.notifyTyping();
                   }}
                   onKeyDown={handleKeyDown}
                   onFocus={() => setPickerOpen(false)}
-                  rows={1}
                   placeholder={
                     editing
                       ? "Измените сообщение"
@@ -1404,7 +1386,7 @@ export default function ChatPage({
                         ? "Пост"
                         : "Сообщение"
                   }
-                  className="no-scrollbar max-h-[120px] min-w-0 flex-1 resize-none bg-transparent py-2.5 text-[16px] text-foreground placeholder:text-muted-2 focus:outline-none"
+                  className="rich-input no-scrollbar max-h-[120px] min-w-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words bg-transparent py-2.5 text-[16px] text-foreground focus:outline-none"
                 />
 
                 {!draft.trim() && !editing && (
