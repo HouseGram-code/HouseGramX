@@ -40,6 +40,8 @@ grant execute on function public.is_premium(uuid) to authenticated;
 -- 3) Закрыта ли личка у получателя (премиум-функция)
 --    В личном чате: второй участник закрыл личку И его Premium активен →
 --    отправка сообщения запрещена.
+--    ИСКЛЮЧЕНИЕ (как в Telegram): если отправитель УЖЕ писал в этот чат раньше,
+--    он остаётся в списке диалогов и может продолжать переписку.
 -- ────────────────────────────────────────────────────────────────────────────
 create or replace function public.recipient_dm_closed(_chat_id text)
   returns boolean
@@ -58,6 +60,12 @@ as $fn$
       and cm.user_id <> auth.uid()
       and p.dm_closed = true
       and coalesce(p.premium_until > now(), false)
+  )
+  -- …но не блокируем тех, кто уже писал в этот чат ранее.
+  and not exists (
+    select 1 from public.messages m
+    where m.chat_id = _chat_id
+      and m.author_id = auth.uid()
   );
 $fn$;
 

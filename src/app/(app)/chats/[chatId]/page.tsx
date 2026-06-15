@@ -237,9 +237,15 @@ export default function ChatPage({
   const iBlockedPeer = !!conv.blocked; // я заблокировал собеседника
   const peerBlockedMe = !!conv.peerBlockedMe; // собеседник заблокировал меня
   // Собеседник закрыл личку (премиум-функция). Писать ему могут только
-  // пользователи с активным Premium.
+  // пользователи с активным Premium ИЛИ те, кто уже писал в этот чат ранее
+  // (как в Telegram — существующие диалоги остаются открытыми).
+  const iWroteBefore = conv.messages.some((m) => m.author === "me");
   const peerDmLocked =
-    isPrivate && !conv.saved && !!peerProfile?.dmClosed && !myPremium;
+    isPrivate &&
+    !conv.saved &&
+    !!peerProfile?.dmClosed &&
+    !myPremium &&
+    !iWroteBefore;
   // Скрываем аватар/статус собеседника, только если ОН заблокировал меня.
   const peerOnline = !peerBlockedMe && (conv.online || isOnline(conv.peerId));
   // Реальная активность собеседника — время его последнего сообщения в чате.
