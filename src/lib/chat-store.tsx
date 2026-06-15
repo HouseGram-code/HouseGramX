@@ -1324,6 +1324,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   };
 
   const toggleBlock: ChatContextValue["toggleBlock"] = (chatId) => {
+    // «Избранное» (Saved Messages) — это чат с самим собой, его нельзя
+    // блокировать.
+    if (state.conversations[chatId]?.saved) return;
     let next = false;
     update(chatId, (c) => {
       next = !c.blocked;

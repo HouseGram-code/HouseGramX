@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { X } from "@phosphor-icons/react";
+import { X, BookmarkSimple } from "@phosphor-icons/react";
 import { Avatar } from "@/components/Avatar";
 import { useChats } from "@/lib/chat-store";
 
@@ -21,7 +21,10 @@ export function ForwardSheet({
   onPick,
 }: ForwardSheetProps) {
   const { conversations } = useChats();
-  const list = conversations.filter((c) => c.id !== excludeId);
+  // «Избранное» (Saved Messages) всегда первым в списке пересылки.
+  const list = conversations
+    .filter((c) => c.id !== excludeId)
+    .sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
 
   return (
     <AnimatePresence>
@@ -67,17 +70,25 @@ export function ForwardSheet({
                     }}
                     className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-2/60 active:bg-surface-2"
                   >
-                    <Avatar initials={c.initials} color={c.color} size={46} />
+                    {c.saved ? (
+                      <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full bg-accent text-white">
+                        <BookmarkSimple size={24} weight="fill" />
+                      </span>
+                    ) : (
+                      <Avatar initials={c.initials} color={c.color} size={46} />
+                    )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[15px] font-semibold text-foreground">
                         {c.title}
                       </span>
                       <span className="block text-[13px] text-muted">
-                        {c.kind === "channel"
-                          ? "Канал"
-                          : c.kind === "bot"
-                            ? "Бот"
-                            : "Личный чат"}
+                        {c.saved
+                          ? "Сохранённые сообщения"
+                          : c.kind === "channel"
+                            ? "Канал"
+                            : c.kind === "bot"
+                              ? "Бот"
+                              : "Личный чат"}
                       </span>
                     </span>
                   </button>

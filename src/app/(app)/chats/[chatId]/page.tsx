@@ -1274,21 +1274,21 @@ export default function ChatPage({
               onStop={recorder.stop}
             />
           ) : (
-            <div className="flex items-end gap-1">
-              <button
-                type="button"
-                aria-label="Стикеры"
-                onClick={() => setPickerOpen((o) => !o)}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted transition active:scale-90 hover:bg-surface-2"
-              >
-                {pickerOpen ? (
-                  <X size={25} weight="bold" />
-                ) : (
-                  <Smiley size={27} weight="regular" />
-                )}
-              </button>
+            <div className="flex items-end gap-1.5">
+              <div className="flex min-w-0 flex-1 items-end rounded-[24px] bg-surface-2 px-1 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ring-1 ring-separator/60">
+                <button
+                  type="button"
+                  aria-label="Стикеры"
+                  onClick={() => setPickerOpen((o) => !o)}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted transition active:scale-90 hover:bg-surface/70"
+                >
+                  {pickerOpen ? (
+                    <X size={25} weight="bold" />
+                  ) : (
+                    <Smiley size={27} weight="regular" />
+                  )}
+                </button>
 
-              <div className="flex min-w-0 flex-1 items-end">
                 <textarea
                   ref={textareaRef}
                   value={draft}
@@ -1321,7 +1321,7 @@ export default function ChatPage({
                         setPickerOpen(false);
                         setAttachOpen(true);
                       }}
-                      className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition active:scale-90"
+                      className="flex h-11 w-10 items-center justify-center rounded-full text-muted transition active:scale-90 hover:bg-surface/70"
                     >
                       <Paperclip size={23} weight="regular" />
                     </button>
@@ -1332,7 +1332,7 @@ export default function ChatPage({
                         const ok = await recorder.start("video");
                         if (!ok) show("Нет доступа к камере");
                       }}
-                      className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition active:scale-90"
+                      className="flex h-11 w-10 items-center justify-center rounded-full text-muted transition active:scale-90 hover:bg-surface/70"
                     >
                       <VideoCamera size={23} weight="regular" />
                     </button>
@@ -1373,7 +1373,7 @@ export default function ChatPage({
                   initial={{ scale: 0.6, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   whileTap={{ scale: 0.85 }}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-white shadow-sm transition"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-white shadow-md shadow-accent/25 transition hover:bg-accent-press"
                 >
                   {editing ? (
                     <Check size={22} weight="bold" />
@@ -1389,9 +1389,9 @@ export default function ChatPage({
                     const ok = await recorder.start("audio");
                     if (!ok) show("Нет доступа к микрофону");
                   }}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted transition active:scale-90 hover:bg-surface-2"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-white shadow-md shadow-accent/25 transition active:scale-90 hover:bg-accent-press"
                 >
-                  <Microphone size={25} weight="regular" />
+                  <Microphone size={24} weight="fill" />
                 </button>
               )}
             </div>

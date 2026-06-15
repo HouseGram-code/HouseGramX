@@ -14,6 +14,20 @@ export function formatCount(n: number): string {
   return `${String(rounded).replace(".", ",")}K`;
 }
 
+/** Размер файла в человекочитаемом виде: 1536 -> "1,5 КБ". */
+export function formatBytes(bytes: number): string {
+  if (!bytes || bytes < 0) return "0 Б";
+  const units = ["Б", "КБ", "МБ", "ГБ"];
+  let value = bytes;
+  let i = 0;
+  while (value >= 1024 && i < units.length - 1) {
+    value /= 1024;
+    i++;
+  }
+  const rounded = i === 0 ? Math.round(value) : Math.round(value * 10) / 10;
+  return `${String(rounded).replace(".", ",")} ${units[i]}`;
+}
+
 /** Формат «был(а) в сети» по времени последнего визита. */
 export function formatLastSeen(ts?: number): string {
   if (!ts) return "был(а) недавно";
