@@ -1,0 +1,28 @@
+name: Trigger Vercel Deploy
+
+# Гарантирует деплой на Vercel при каждом пуше в main, даже если родной
+# вебхук GitHub→Vercel пропустит событие (бывает периодически).
+#
+# НАСТРОЙКА (один раз):
+# 1. Vercel → проект → Settings → Git → Deploy Hooks → создайте хук для ветки
+#    main, скопируйте URL.
+# 2. GitHub → репозиторий → Settings → Secrets and variables → Actions →
+#    New repository secret: имя VERCEL_DEPLOY_HOOK, значение = URL хука.
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  trigger-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Vercel Deploy Hook
+        run: |
+          if [ -z "${{ secrets.VERCEL_DEPLOY_HOOK }}" ]; then
+            echo "VERCEL_DEPLOY_HOOK не задан — пропускаю (настройте секрет)."
+            exit 0
+          fi
+          echo "Триггерю деплой Vercel…"
+          curl -fsS -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
+          echo "Готово."

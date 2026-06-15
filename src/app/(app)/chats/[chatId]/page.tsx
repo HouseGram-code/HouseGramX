@@ -60,6 +60,7 @@ import { useGroupCall, useCallWatch } from "@/lib/group-call";
 import { useChatTyping } from "@/lib/typing";
 import { useSettings } from "@/lib/settings-store";
 import { useStickers, type StickerSet, isPremiumStickerSrc } from "@/lib/stickers-store";
+import { hasPremiumEmoji } from "@/lib/premium-emoji";
 import { useProfile } from "@/lib/profile-store";
 import { usePresence, useLastSeen } from "@/lib/presence-store";
 import { setActiveChat } from "@/lib/notify";
@@ -1114,10 +1115,13 @@ export default function ChatPage({
         excludeId={conv.id}
         onClose={() => setForwardId(null)}
         onPick={(toId) => {
-          // Премиум-стикеры нельзя пересылать без активной подписки.
+          // Премиум-стикеры и премиум-эмодзи нельзя пересылать без подписки.
           const isPremiumMsg = (mid: string) => {
             const m = conv.messages.find((x) => x.id === mid);
-            return m?.kind === "sticker" && isPremiumStickerSrc(m.stickerSrc);
+            if (!m) return false;
+            if (m.kind === "sticker" && isPremiumStickerSrc(m.stickerSrc))
+              return true;
+            return hasPremiumEmoji(m.text);
           };
           const ids =
             forwardId === "__multi__"
@@ -1128,7 +1132,7 @@ export default function ChatPage({
           if (!myPremium && ids.some(isPremiumMsg)) {
             setForwardId(null);
             if (forwardId === "__multi__") exitSelect();
-            show("Премиум-стикеры нельзя пересылать без HouseGram Premium");
+            show("Премиум-контент нельзя пересылать без HouseGram Premium");
             return;
           }
           ids.forEach((mid) => forwardMessage(conv.id, mid, toId));

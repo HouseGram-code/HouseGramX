@@ -33,6 +33,7 @@ import { ConfirmSheet, type ConfirmConfig } from "@/components/ConfirmSheet";
 import { useChats, type Conversation, type Message } from "@/lib/chat-store";
 import { useActiveCallChats } from "@/lib/group-call";
 import { countUnread, searchUsers, type FoundUser } from "@/lib/chat-remote";
+import { stripPremiumEmoji } from "@/lib/premium-emoji";
 import { usePresence } from "@/lib/presence-store";
 import { ConnectionTitle } from "@/components/ConnectionTitle";
 import { cn } from "@/lib/utils";
@@ -78,7 +79,7 @@ function lastPreview(conv: Conversation) {
             : "Файл";
     return { text: `${prefix}${label}`, time: last.time, activity: false };
   }
-  return { text: `${prefix}${last.text ?? ""}`, time: last.time, activity: false };
+  return { text: `${prefix}${stripPremiumEmoji(last.text)}`, time: last.time, activity: false };
 }
 
 export default function ChatsPage() {

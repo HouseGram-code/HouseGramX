@@ -19,6 +19,7 @@ import { StickerImage } from "@/components/StickerImage";
 import { useStickers, type Sticker } from "@/lib/stickers-store";
 import { useSettings } from "@/lib/settings-store";
 import { fetchMyPremium } from "@/lib/premium";
+import { PREMIUM_EMOJIS, premiumEmojiToken } from "@/lib/premium-emoji";
 import { useToast } from "@/components/Toast";
 import { cn } from "@/lib/utils";
 
@@ -101,18 +102,82 @@ export function StickerPicker({
         >
           {tab === "emoji" ? (
             // Telegram-стиль: эмодзи-картинки Apple через библиотеку
-            <div className="flex-1 overflow-hidden [&_.epr-main]:!border-0 [&_.epr-main]:!bg-transparent">
-              <EmojiPicker
-                onEmojiClick={(data: EmojiClickData) => onEmoji?.(data.emoji)}
-                emojiStyle={EmojiStyle.APPLE}
-                theme={emojiTheme}
-                width="100%"
-                height={310}
-                lazyLoadEmojis
-                previewConfig={{ showPreview: false }}
-                searchPlaceholder="Найти эмодзи"
-                skinTonesDisabled
-              />
+            <div className="flex flex-1 flex-col overflow-hidden">
+              {/* Премиум кастом-эмодзи (инлайн в текст) */}
+              <div className="shrink-0 border-b border-separator px-2 py-2">
+                <div className="mb-1.5 flex items-center gap-1.5 px-1">
+                  <span className="text-xs font-medium uppercase tracking-wide text-muted">
+                    Premium эмодзи
+                  </span>
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                      !isPremium && !allowPremium
+                        ? "bg-accent/15 text-accent"
+                        : "bg-green-500/15 text-green-600"
+                    )}
+                  >
+                    <Key size={10} weight="fill" />
+                    {!isPremium && !allowPremium
+                      ? "Premium"
+                      : allowPremium && !isPremium
+                        ? "Бесплатно"
+                        : "Открыт"}
+                  </span>
+                </div>
+                <div className="no-scrollbar flex gap-1.5 overflow-x-auto">
+                  {PREMIUM_EMOJIS.map((pe) => {
+                    const locked = !isPremium && !allowPremium;
+                    return (
+                      <button
+                        key={pe.id}
+                        type="button"
+                        aria-label={pe.label}
+                        onClick={() => {
+                          if (locked) {
+                            show("Эмодзи доступно только с HouseGram Premium");
+                            router.push("/settings/premium");
+                            return;
+                          }
+                          onEmoji?.(premiumEmojiToken(pe.id));
+                        }}
+                        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-2 transition active:scale-90"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={pe.src}
+                          alt={pe.label}
+                          width={32}
+                          height={32}
+                          className={cn(
+                            "object-contain",
+                            locked && "opacity-40 blur-[1px]"
+                          )}
+                        />
+                        {locked && (
+                          <span className="absolute flex h-5 w-5 items-center justify-center rounded-full bg-accent text-white">
+                            <Key size={11} weight="fill" />
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-hidden [&_.epr-main]:!border-0 [&_.epr-main]:!bg-transparent">
+                <EmojiPicker
+                  onEmojiClick={(data: EmojiClickData) => onEmoji?.(data.emoji)}
+                  emojiStyle={EmojiStyle.APPLE}
+                  theme={emojiTheme}
+                  width="100%"
+                  height={236}
+                  lazyLoadEmojis
+                  previewConfig={{ showPreview: false }}
+                  searchPlaceholder="Найти эмодзи"
+                  skinTonesDisabled
+                />
+              </div>
             </div>
           ) : (
             <>
