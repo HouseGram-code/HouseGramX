@@ -35,7 +35,13 @@ import { PremiumBadge } from "@/components/PremiumBadge";
 import { MessageBubble } from "@/components/MessageBubble";
 import { RichInput, type RichInputHandle } from "@/components/RichInput";
 import { ChannelPost } from "@/components/ChannelPost";
-import { StickerPicker } from "@/components/StickerPicker";
+import dynamic from "next/dynamic";
+// Пикер стикеров/эмодзи тянет тяжёлую emoji-picker-react — грузим лениво,
+// только когда пользователь впервые открывает панель.
+const StickerPicker = dynamic(
+  () => import("@/components/StickerPicker").then((m) => m.StickerPicker),
+  { ssr: false }
+);
 import { StickerSetSheet } from "@/components/StickerSetSheet";
 import {
   MessageActions,
@@ -120,6 +126,11 @@ export default function ChatPage({
 
   const [draft, setDraft] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Монтируем пикер только после первого открытия (ленивая загрузка чанка).
+  const [pickerLoaded, setPickerLoaded] = useState(false);
+  useEffect(() => {
+    if (pickerOpen) setPickerLoaded(true);
+  }, [pickerOpen]);
   // Набор стикеров, открытый по тапу на присланный стикер.
   const [stickerSheet, setStickerSheet] = useState<StickerSet | null>(null);
   const [attachOpen, setAttachOpen] = useState(false);
@@ -1247,7 +1258,8 @@ export default function ChatPage({
         (!isSubscribedChannel || canPostChannel) &&
         !notJoined &&
         !iBlockedPeer &&
-        !peerBlockedMe && (
+        !peerBlockedMe &&
+        pickerLoaded && (
         <StickerPicker
           open={pickerOpen}
           allowPremium={conv.saved || myPremium}

@@ -1,7 +1,6 @@
 "use client";
 
 import { Fragment, useMemo } from "react";
-import { Emoji, EmojiStyle } from "emoji-picker-react";
 import { PE_TOKEN_RE, getPremiumEmoji } from "@/lib/premium-emoji";
 
 interface RichTextProps {
@@ -9,6 +8,10 @@ interface RichTextProps {
   /** Базовый размер шрифта (эмодзи чуть крупнее). */
   fontSize?: number;
 }
+
+/** CDN с Apple-эмодзи (тот же источник, что и emoji-picker-react). */
+const APPLE_EMOJI_CDN =
+  "https://cdn.jsdelivr.net/npm/emoji-datasource-apple/img/apple/64/";
 
 const EMOJI_RE = /\p{Extended_Pictographic}/u;
 
@@ -110,10 +113,22 @@ export function RichText({ text, fontSize = 15 }: RichTextProps) {
               className="inline-block align-middle"
               style={{ verticalAlign: "-0.15em" }}
             >
-              <Emoji
-                unified={toUnified(seg.value)}
-                emojiStyle={EmojiStyle.APPLE}
-                size={emojiSize}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`${APPLE_EMOJI_CDN}${toUnified(seg.value)}.png`}
+                alt={seg.value}
+                width={emojiSize}
+                height={emojiSize}
+                loading="lazy"
+                decoding="async"
+                draggable={false}
+                style={{ width: emojiSize, height: emojiSize }}
+                className="inline-block object-contain"
+                onError={(e) => {
+                  // Если картинки нет — показываем нативный эмодзи.
+                  const el = e.currentTarget;
+                  el.replaceWith(document.createTextNode(seg.value));
+                }}
               />
             </span>
           )
