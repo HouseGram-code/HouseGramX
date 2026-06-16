@@ -9,6 +9,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type RecordMode = "audio" | "video";
 
+/** Максимальная длительность записи (как у видео-кружков в Telegram). */
+export const MAX_RECORD_SECONDS = 60;
+
 interface UseRecorderResult {
   recording: boolean;
   mode: RecordMode | null;
@@ -21,7 +24,7 @@ interface UseRecorderResult {
 }
 
 export function useRecorder(
-  onComplete: (file: File) => void
+  onComplete: (file: File, mode: RecordMode) => void
 ): UseRecorderResult {
   const [recording, setRecording] = useState(false);
   const [mode, setMode] = useState<RecordMode | null>(null);
@@ -83,8 +86,8 @@ export function useRecorder(
         if (!wasCancelled && blob.size > 0) {
           const ext = type.includes("mp4") ? "mp4" : "webm";
           const name =
-            m === "video" ? `Видео-${Date.now()}.${ext}` : `Голос-${Date.now()}.${ext}`;
-          onCompleteRef.current(new File([blob], name, { type }));
+            m === "video" ? `Кружок-${Date.now()}.${ext}` : `Голос-${Date.now()}.${ext}`;
+          onCompleteRef.current(new File([blob], name, { type }), m);
         }
       };
 
@@ -92,7 +95,21 @@ export function useRecorder(
       setRecording(true);
       setMode(m);
       setSeconds(0);
-      timerRef.current = setInterval(() => setSeconds((x) => x + 1), 1000);
+      timerRef.current = setInterval(
+        () =>
+          setSeconds((x) => {
+            const next = x + 1;
+            // Автостоп по достижении максимума (как видео-кружок в Telegram).
+            if (next >= MAX_RECORD_SECONDS) {
+              cancelledRef.current = false;
+              if (recRef.current && recRef.current.state !== "inactive") {
+                recRef.current.stop();
+              }
+            }
+            return next;
+          }),
+        1000
+      );
       return true;
     } catch (e) {
       console.warn("[recorder] start failed:", e);

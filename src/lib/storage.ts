@@ -89,7 +89,7 @@ export function fileToDataUrl(file: File): Promise<string> {
 
 // ─── Вложения в чат (bucket "media") с прогрессом загрузки ───────────────────
 
-export type MediaKind = "image" | "video" | "audio" | "file";
+export type MediaKind = "image" | "video" | "audio" | "file" | "circle";
 
 export function detectMediaKind(file: File): MediaKind {
   const t = file.type;

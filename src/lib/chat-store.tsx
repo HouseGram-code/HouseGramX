@@ -39,7 +39,7 @@ import {
 export type MessageKind = "text" | "sticker" | "system" | "media";
 export type ChatKind = "bot" | "private" | "channel" | "group";
 /** Тип вложения. */
-export type MediaKind = "image" | "video" | "audio" | "file";
+export type MediaKind = "image" | "video" | "audio" | "file" | "circle";
 /** Текущая активность собеседника. */
 export type Activity = "typing" | "sticker" | null;
 
@@ -293,7 +293,7 @@ interface ChatContextValue {
     setId?: string
   ) => void;
   /** Отправить вложение (фото/видео/аудио/файл) с загрузкой в Storage. */
-  sendMedia: (chatId: string, file: File) => void;
+  sendMedia: (chatId: string, file: File, kindOverride?: MediaKind) => void;
   setReaction: (chatId: string, messageId: string, emoji: string) => void;
   deleteMessage: (chatId: string, messageId: string) => void;
   deleteMessages: (chatId: string, messageIds: string[]) => void;
@@ -699,9 +699,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                   ? "📷 Фото"
                   : msg.mediaKind === "video"
                     ? "🎬 Видео"
-                    : msg.mediaKind === "audio"
-                      ? "🎵 Аудио"
-                      : "📎 Файл"
+                    : msg.mediaKind === "circle"
+                      ? "📹 Видеосообщение"
+                      : msg.mediaKind === "audio"
+                        ? "🎵 Аудио"
+                        : "📎 Файл"
                 : st.messagePreview
                   ? (msg.text ?? "")
                   : "Новое сообщение";
@@ -1159,13 +1161,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const sendMedia: ChatContextValue["sendMedia"] = (chatId, file) => {
+  const sendMedia: ChatContextValue["sendMedia"] = (chatId, file, kindOverride) => {
     const id = uid();
     const localPreview =
       file.type.startsWith("image/") || file.type.startsWith("video/")
         ? URL.createObjectURL(file)
         : undefined;
-    const mediaKind = detectMediaKind(file);
+    const mediaKind = kindOverride ?? detectMediaKind(file);
 
     // Оптимистично показываем сообщение с прогрессом загрузки.
     const optimistic: Message = {
@@ -1213,7 +1215,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         mediaUrl: res.url,
         mediaName: res.name,
         mediaSize: res.size,
-        mediaKind: res.kind,
+        mediaKind: kindOverride ?? res.kind,
         uploadProgress: undefined,
         pending: false,
         failed: false,

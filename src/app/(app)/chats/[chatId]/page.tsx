@@ -23,7 +23,6 @@ import {
   Paperclip,
   Microphone,
   VideoCamera,
-  Stop,
   TrashSimple,
   Prohibit,
   LockKey,
@@ -65,7 +64,7 @@ import { hasPremiumEmoji } from "@/lib/premium-emoji";
 import { useProfile } from "@/lib/profile-store";
 import { usePresence, useLastSeen } from "@/lib/presence-store";
 import { setActiveChat } from "@/lib/notify";
-import { useRecorder } from "@/lib/use-recorder";
+import { useRecorder, type RecordMode, MAX_RECORD_SECONDS } from "@/lib/use-recorder";
 import { useToast } from "@/components/Toast";
 import { formatLastSeen } from "@/lib/utils";
 
@@ -154,9 +153,13 @@ export default function ChatPage({
   const peerLastSeen = useLastSeen(conv?.peerId);
 
   // Запись голоса/видео-кружка. По завершении — отправляем как вложение.
-  const recorder = useRecorder((file) => {
-    sendMedia(chatId, file);
+  // Видео отправляем как «кружок» (mediaKind: circle).
+  const recorder = useRecorder((file, mode) => {
+    sendMedia(chatId, file, mode === "video" ? "circle" : undefined);
   });
+
+  // Режим записи на кнопке композера: голос ↔ видео-кружок (как в Telegram).
+  const [recordMode, setRecordMode] = useState<RecordMode>("audio");
 
   // Привязываем видеопоток к превью при записи видео.
   useEffect(() => {
@@ -1401,17 +1404,6 @@ export default function ChatPage({
                     >
                       <Paperclip size={23} weight="regular" />
                     </button>
-                    <button
-                      type="button"
-                      aria-label="Видеосообщение"
-                      onClick={async () => {
-                        const ok = await recorder.start("video");
-                        if (!ok) show("Нет доступа к камере");
-                      }}
-                      className="flex h-11 w-10 items-center justify-center rounded-full text-muted transition active:scale-90 hover:bg-surface/70"
-                    >
-                      <VideoCamera size={23} weight="regular" />
-                    </button>
                   </div>
                 )}
               </div>
@@ -1458,17 +1450,81 @@ export default function ChatPage({
                   )}
                 </motion.button>
               ) : (
-                <button
-                  type="button"
-                  aria-label="Голосовое сообщение"
-                  onClick={async () => {
-                    const ok = await recorder.start("audio");
-                    if (!ok) show("Нет доступа к микрофону");
-                  }}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-white shadow-md shadow-accent/25 transition active:scale-90 hover:bg-accent-press"
-                >
-                  <Microphone size={24} weight="fill" />
-                </button>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {/* Переключатель: голос ↔ видео-кружок (приятная анимация смены иконки) */}
+                  <button
+                    type="button"
+                    aria-label={
+                      recordMode === "audio"
+                        ? "Переключить на видео-кружок"
+                        : "Переключить на голосовое"
+                    }
+                    onClick={() =>
+                      setRecordMode((m) => (m === "audio" ? "video" : "audio"))
+                    }
+                    className="flex h-11 w-11 items-center justify-center rounded-full text-muted transition active:scale-90 hover:bg-surface-2"
+                  >
+                    <AnimatePresence mode="popLayout" initial={false}>
+                      <motion.span
+                        key={recordMode === "audio" ? "to-video" : "to-audio"}
+                        initial={{ scale: 0, rotate: -120, opacity: 0 }}
+                        animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                        exit={{ scale: 0, rotate: 120, opacity: 0 }}
+                        transition={{ type: "spring", stiffness: 500, damping: 24 }}
+                      >
+                        {recordMode === "audio" ? (
+                          <VideoCamera size={24} weight="regular" />
+                        ) : (
+                          <Microphone size={24} weight="regular" />
+                        )}
+                      </motion.span>
+                    </AnimatePresence>
+                  </button>
+
+                  {/* Запись в текущем режиме */}
+                  <motion.button
+                    type="button"
+                    aria-label={
+                      recordMode === "audio"
+                        ? "Голосовое сообщение"
+                        : "Видео-кружок"
+                    }
+                    onClick={async () => {
+                      const ok = await recorder.start(recordMode);
+                      if (!ok)
+                        show(
+                          recordMode === "audio"
+                            ? "Нет доступа к микрофону"
+                            : "Нет доступа к камере"
+                        );
+                    }}
+                    whileTap={{ scale: 0.85 }}
+                    animate={{
+                      boxShadow:
+                        recordMode === "video"
+                          ? "0 0 0 4px rgba(250,58,58,0.18)"
+                          : "0 4px 10px rgba(250,58,58,0.25)",
+                    }}
+                    className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-accent text-white transition hover:bg-accent-press"
+                  >
+                    <AnimatePresence mode="popLayout" initial={false}>
+                      <motion.span
+                        key={recordMode}
+                        initial={{ y: 18, scale: 0.4, opacity: 0 }}
+                        animate={{ y: 0, scale: 1, opacity: 1 }}
+                        exit={{ y: -18, scale: 0.4, opacity: 0 }}
+                        transition={{ type: "spring", stiffness: 520, damping: 26 }}
+                        className="absolute inset-0 flex items-center justify-center"
+                      >
+                        {recordMode === "audio" ? (
+                          <Microphone size={24} weight="fill" />
+                        ) : (
+                          <VideoCamera size={24} weight="fill" />
+                        )}
+                      </motion.span>
+                    </AnimatePresence>
+                  </motion.button>
+                </div>
               )}
             </div>
           )}
@@ -1647,7 +1703,7 @@ export default function ChatPage({
   );
 }
 
-/** Панель активной записи голоса/видео (как в Telegram). */
+/** Панель активной записи голоса/видео-кружка (как в Telegram). */
 function RecordingBar({
   mode,
   seconds,
@@ -1663,19 +1719,41 @@ function RecordingBar({
 }) {
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
   const ss = String(seconds % 60).padStart(2, "0");
+  const progress = Math.min(seconds / MAX_RECORD_SECONDS, 1);
+  const R = 30;
+  const C = 2 * Math.PI * R;
 
   return (
     <div className="flex items-center gap-3">
-      {/* Превью видео-кружка */}
+      {/* Превью видео-кружка с круговым прогрессом */}
       {mode === "video" && (
-        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full ring-2 ring-accent">
-          <video
-            ref={videoRef}
-            autoPlay
-            muted
-            playsInline
-            className="h-full w-full object-cover"
-          />
+        <div className="relative h-16 w-16 shrink-0">
+          <div className="h-16 w-16 overflow-hidden rounded-full ring-2 ring-accent/30">
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              playsInline
+              className="h-full w-full -scale-x-100 object-cover"
+            />
+          </div>
+          <svg
+            className="pointer-events-none absolute inset-0 h-16 w-16 -rotate-90"
+            viewBox="0 0 64 64"
+          >
+            <circle
+              cx="32"
+              cy="32"
+              r={R}
+              fill="none"
+              stroke="var(--accent)"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeDasharray={C}
+              strokeDashoffset={C * (1 - progress)}
+              style={{ transition: "stroke-dashoffset 1s linear" }}
+            />
+          </svg>
         </div>
       )}
 
@@ -1684,23 +1762,39 @@ function RecordingBar({
         type="button"
         aria-label="Отменить"
         onClick={onСancel}
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-surface-2"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-surface-2 active:scale-90"
       >
         <TrashSimple size={22} weight="regular" />
       </button>
 
-      {/* Индикатор и таймер */}
+      {/* Индикатор, таймер и «волна» */}
       <div className="flex flex-1 items-center gap-2.5 rounded-2xl bg-surface-2 px-4 py-2.5">
         <motion.span
-          className="h-2.5 w-2.5 rounded-full bg-red-500"
+          className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-500"
           animate={{ opacity: [1, 0.2, 1] }}
           transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
         />
         <span className="text-[15px] font-medium tabular-nums text-foreground">
           {mm}:{ss}
         </span>
-        <span className="text-[13px] text-muted">
-          {mode === "video" ? "Запись видео…" : "Запись голоса…"}
+        {/* Анимированная звуковая волна */}
+        <div className="flex flex-1 items-center justify-center gap-[3px]">
+          {Array.from({ length: 18 }).map((_, i) => (
+            <motion.span
+              key={i}
+              className="w-[3px] rounded-full bg-accent/70"
+              animate={{ height: [6, 6 + ((i * 7) % 18) + 8, 6] }}
+              transition={{
+                duration: 0.9,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: (i % 6) * 0.08,
+              }}
+            />
+          ))}
+        </div>
+        <span className="shrink-0 text-[13px] text-muted">
+          {mode === "video" ? "Кружок…" : "Голос…"}
         </span>
       </div>
 
@@ -1710,9 +1804,16 @@ function RecordingBar({
         aria-label="Остановить и отправить"
         onClick={onStop}
         whileTap={{ scale: 0.85 }}
+        animate={{
+          boxShadow: [
+            "0 0 0 0 rgba(250,58,58,0.4)",
+            "0 0 0 8px rgba(250,58,58,0)",
+          ],
+        }}
+        transition={{ duration: 1.4, repeat: Infinity }}
         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-white shadow-sm"
       >
-        <Stop size={20} weight="fill" />
+        <PaperPlaneRight size={18} weight="fill" />
       </motion.button>
     </div>
   );

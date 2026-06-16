@@ -81,7 +81,8 @@ export function MessageBubble({
   // Фото/видео — без рамки и паддингов (как стикер). Файл/аудио — в пузыре.
   const isVisualMedia =
     isMedia && (message.mediaKind === "image" || message.mediaKind === "video");
-  const bare = isSticker || isVisualMedia;
+  const isCircle = isMedia && message.mediaKind === "circle";
+  const bare = isSticker || isVisualMedia || isCircle;
   const reaction = message.reaction ? getReaction(message.reaction) : null;
   const withSender = showSender && !mine;
   const mediaItem: MediaViewerItem | null =
@@ -296,6 +297,10 @@ function MediaContent({ message, mine, onOpen }: { message: Message; mine: boole
     );
   }
 
+  if (mediaKind === "circle") {
+    return <VideoCircle url={mediaUrl} uploading={uploading} percent={uploadProgress} />;
+  }
+
   if (mediaKind === "audio") {
     return (
       <div className="flex min-w-[200px] items-center gap-3 py-1">
@@ -386,5 +391,122 @@ function PlayBadge() {
         <Play size={28} weight="fill" />
       </span>
     </span>
+  );
+}
+
+/**
+ * Видео-кружок (видеосообщение, как в Telegram).
+ * Тап — воспроизведение со звуком, по кругу идёт прогресс-кольцо.
+ */
+function VideoCircle({
+  url,
+  uploading,
+  percent,
+}: {
+  url?: string;
+  uploading: boolean;
+  percent?: number;
+}) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [remain, setRemain] = useState(0);
+
+  const R = 48;
+  const C = 2 * Math.PI * R;
+
+  const toggle = (e: ReactMouseEvent) => {
+    e.stopPropagation();
+    const v = ref.current;
+    if (!v) return;
+    if (v.paused) {
+      v.muted = false;
+      void v.play();
+    } else {
+      v.pause();
+    }
+  };
+
+  return (
+    <div
+      onClick={toggle}
+      className="relative cursor-pointer select-none"
+      style={{ width: "min(62vw, 224px)", height: "min(62vw, 224px)" }}
+    >
+      <div className="h-full w-full overflow-hidden rounded-full bg-black shadow-[0_6px_24px_rgba(0,0,0,0.35)] ring-1 ring-black/10">
+        <video
+          ref={ref}
+          src={url}
+          playsInline
+          preload="metadata"
+          className="h-full w-full object-cover"
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onEnded={() => {
+            setPlaying(false);
+            setProgress(0);
+          }}
+          onLoadedMetadata={(e) => {
+            const d = e.currentTarget.duration;
+            if (Number.isFinite(d)) setRemain(Math.ceil(d));
+          }}
+          onTimeUpdate={(e) => {
+            const v = e.currentTarget;
+            if (v.duration > 0) {
+              setProgress(v.currentTime / v.duration);
+              setRemain(Math.max(0, Math.ceil(v.duration - v.currentTime)));
+            }
+          }}
+        />
+      </div>
+
+      {/* Кольцо прогресса воспроизведения */}
+      <svg
+        className="pointer-events-none absolute inset-0 h-full w-full -rotate-90"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+      >
+        <circle cx="50" cy="50" r={R} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="2.5" />
+        <circle
+          cx="50"
+          cy="50"
+          r={R}
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeDasharray={C}
+          strokeDashoffset={C * (1 - progress)}
+        />
+      </svg>
+
+      {/* Кнопка play по центру (когда на паузе) */}
+      {!playing && !uploading && (
+        <motion.span
+          initial={{ scale: 0.6, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center"
+        >
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm">
+            <Play size={28} weight="fill" />
+          </span>
+        </motion.span>
+      )}
+
+      {/* Таймер длительности */}
+      {!uploading && (
+        <span className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-medium tabular-nums text-white backdrop-blur-sm">
+          {String(Math.floor(remain / 60)).padStart(2, "0")}:
+          {String(remain % 60).padStart(2, "0")}
+        </span>
+      )}
+
+      {/* Оверлей загрузки */}
+      {uploading && typeof percent === "number" && (
+        <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+          <span className="text-[13px] font-semibold text-white">{percent}%</span>
+        </div>
+      )}
+    </div>
   );
 }
