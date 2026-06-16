@@ -77,6 +77,17 @@ export const RichInput = forwardRef<RichInputHandle, RichInputProps>(
   function RichInput({ value, onChange, onKeyDown, placeholder, className }, ref) {
     const el = useRef<HTMLDivElement>(null);
     const lastValue = useRef<string>("\u0000");
+    // Запоминаем позицию курсора, чтобы вставлять эмодзи туда даже после
+    // того, как фокус ушёл на панель выбора эмодзи.
+    const savedRange = useRef<Range | null>(null);
+
+    const saveCaret = () => {
+      const node = el.current;
+      const sel = window.getSelection();
+      if (node && sel && sel.rangeCount && node.contains(sel.anchorNode)) {
+        savedRange.current = sel.getRangeAt(0).cloneRange();
+      }
+    };
 
     const emit = () => {
       const node = el.current;
@@ -108,7 +119,13 @@ export const RichInput = forwardRef<RichInputHandle, RichInputProps>(
         node.focus();
         const sel = window.getSelection();
         let range: Range;
-        if (sel && sel.rangeCount && node.contains(sel.anchorNode)) {
+        // Приоритет — сохранённая позиция курсора (до клика по панели).
+        if (
+          savedRange.current &&
+          node.contains(savedRange.current.startContainer)
+        ) {
+          range = savedRange.current;
+        } else if (sel && sel.rangeCount && node.contains(sel.anchorNode)) {
           range = sel.getRangeAt(0);
         } else {
           range = document.createRange();
@@ -131,6 +148,7 @@ export const RichInput = forwardRef<RichInputHandle, RichInputProps>(
           after.collapse(true);
           sel?.removeAllRanges();
           sel?.addRange(after);
+          savedRange.current = after.cloneRange();
         }
         emit();
       },
@@ -145,6 +163,9 @@ export const RichInput = forwardRef<RichInputHandle, RichInputProps>(
         suppressContentEditableWarning
         data-placeholder={placeholder}
         onInput={emit}
+        onKeyUp={saveCaret}
+        onMouseUp={saveCaret}
+        onBlur={saveCaret}
         onKeyDown={onKeyDown}
         className={className}
       />
