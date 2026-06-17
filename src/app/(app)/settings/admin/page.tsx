@@ -20,6 +20,9 @@ import {
   Wrench,
   SealCheck,
   Star,
+  Ticket,
+  Trash,
+  Plus,
 } from "@phosphor-icons/react";
 import { SubScreen } from "@/components/SubScreen";
 import { Avatar } from "@/components/Avatar";
@@ -42,6 +45,12 @@ import {
   type AdminStats,
 } from "@/lib/admin";
 import { formatPremiumUntil } from "@/lib/premium";
+import {
+  createPromoCode,
+  fetchPromoCodes,
+  deletePromoCode,
+  type PromoCode,
+} from "@/lib/promo";
 import { formatLastSeen } from "@/lib/utils";
 
 type Filter = "all" | "active" | "banned";
@@ -70,6 +79,13 @@ export default function AdminPage() {
   const [premDays, setPremDays] = useState("30");
   const [premBusy, setPremBusy] = useState(false);
 
+  // Состояние промокодов.
+  const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoDays, setPromoDays] = useState("30");
+  const [promoActivations, setPromoActivations] = useState("1");
+  const [promoBusy, setPromoBusy] = useState(false);
+
   const isAdmin = isAdminEmail(user?.email);
 
   // Доступ только админу.
@@ -94,6 +110,11 @@ export default function AdminPage() {
       setError("Не удалось загрузить пользователей");
     } finally {
       setLoading(false);
+    }
+    try {
+      setPromoCodes(await fetchPromoCodes());
+    } catch {
+      /* промокоды не критичны для остального экрана */
     }
   };
 
@@ -179,6 +200,57 @@ export default function AdminPage() {
     } finally {
       setPremBusy(false);
     }
+  };
+
+  const createPromo = async () => {
+    const c = promoCode.trim().toUpperCase();
+    const days = parseInt(promoDays, 10);
+    const acts = parseInt(promoActivations, 10);
+    if (!c) {
+      show("Введите название промокода");
+      return;
+    }
+    if (!days || days <= 0) {
+      show("Укажите число дней");
+      return;
+    }
+    if (!acts || acts <= 0) {
+      show("Укажите число активаций");
+      return;
+    }
+    setPromoBusy(true);
+    try {
+      const created = await createPromoCode(c, days, acts);
+      setPromoCodes((prev) => [created, ...prev]);
+      show("Промокод создан");
+      setPromoCode("");
+    } catch (e) {
+      show(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setPromoBusy(false);
+    }
+  };
+
+  const removePromo = (code: string) => {
+    setConfirm({
+      title: "Удалить промокод?",
+      message: `Промокод ${code} больше нельзя будет активировать.`,
+      actions: [
+        {
+          label: "Удалить",
+          danger: true,
+          onClick: async () => {
+            try {
+              await deletePromoCode(code);
+              setPromoCodes((prev) => prev.filter((p) => p.code !== code));
+              show("Промокод удалён");
+            } catch (e) {
+              show(e instanceof Error ? e.message : "Ошибка");
+            }
+          },
+        },
+      ],
+    });
   };
 
   const exportCsv = () => {
@@ -438,6 +510,116 @@ export default function AdminPage() {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Промокоды Premium */}
+      <div className="px-3 pt-4">
+        <div className="overflow-hidden rounded-[var(--radius-card)] bg-surface ring-1 ring-separator">
+          <div className="flex items-center gap-3 px-4 py-3.5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-press text-white">
+              <Ticket size={20} weight="fill" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[15px] font-semibold text-foreground">
+                Создать промокод
+              </p>
+              <p className="text-[12px] text-muted">
+                Название, срок Premium и число активаций
+              </p>
+            </div>
+          </div>
+
+          <div className="border-t border-separator px-4 py-3">
+            <input
+              value={promoCode}
+              onChange={(e) =>
+                setPromoCode(e.target.value.toUpperCase().replace(/\s+/g, ""))
+              }
+              placeholder="НАЗВАНИЕ (например, WELCOME)"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              className="w-full rounded-xl bg-surface-2 px-3 py-2.5 text-[15px] font-semibold uppercase tracking-wide text-foreground placeholder:font-normal placeholder:tracking-normal placeholder:text-muted-2 focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+            <div className="mt-2 flex items-center gap-2">
+              <div className="flex flex-1 items-center gap-1.5 rounded-xl bg-surface-2 px-3">
+                <input
+                  value={promoDays}
+                  onChange={(e) =>
+                    setPromoDays(e.target.value.replace(/[^0-9]/g, ""))
+                  }
+                  inputMode="numeric"
+                  placeholder="30"
+                  className="w-full bg-transparent py-2.5 text-[15px] text-foreground placeholder:text-muted-2 focus:outline-none"
+                />
+                <span className="shrink-0 text-[13px] text-muted">дней</span>
+              </div>
+              <div className="flex flex-1 items-center gap-1.5 rounded-xl bg-surface-2 px-3">
+                <input
+                  value={promoActivations}
+                  onChange={(e) =>
+                    setPromoActivations(e.target.value.replace(/[^0-9]/g, ""))
+                  }
+                  inputMode="numeric"
+                  placeholder="1"
+                  className="w-full bg-transparent py-2.5 text-[15px] text-foreground placeholder:text-muted-2 focus:outline-none"
+                />
+                <span className="shrink-0 text-[13px] text-muted">актив.</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={promoBusy}
+              onClick={createPromo}
+              className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-2xl bg-accent py-3 text-[15px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
+            >
+              {promoBusy ? (
+                <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              ) : (
+                <>
+                  <Plus size={18} weight="bold" />
+                  Создать промокод
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Список созданных промокодов */}
+          {promoCodes.length > 0 && (
+            <div className="border-t border-separator">
+              {promoCodes.map((p) => {
+                const left = Math.max(0, p.max_activations - p.used_count);
+                const exhausted = left <= 0;
+                return (
+                  <div
+                    key={p.code}
+                    className="flex items-center gap-3 px-4 py-3 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-separator"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[15px] font-bold tracking-wide text-foreground">
+                        {p.code}
+                      </p>
+                      <p className="text-[12px] text-muted">
+                        {p.premium_days} дн. Premium ·{" "}
+                        <span className={exhausted ? "text-red-500" : ""}>
+                          {p.used_count}/{p.max_activations} активаций
+                        </span>
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removePromo(p.code)}
+                      aria-label="Удалить промокод"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-surface-2 hover:text-red-500 active:scale-95"
+                    >
+                      <Trash size={18} weight="bold" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 

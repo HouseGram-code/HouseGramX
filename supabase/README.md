@@ -74,6 +74,7 @@ SUPABASE_SERVICE_ROLE_KEY=sb_secret_...   # только сервер, в кли
 2. `supabase/admin.sql` — админ-панель, бан-система, статистика.
 3. `supabase/badge.sql` — бейдж «Багхантер».
 4. `supabase/premium.sql` — **HouseGram Premium** и «Закрытая личка».
+5. `supabase/promo.sql` — **промокоды Premium** (выдача Premium по коду).
 
 После `premium.sql` появятся:
 - колонки `profiles.premium_until`, `profiles.dm_closed` и `profiles.premium_status`;
@@ -84,6 +85,17 @@ SUPABASE_SERVICE_ROLE_KEY=sb_secret_...   # только сервер, в кли
   ему нельзя написать в личные сообщения (проверка в политике `messages_insert`).
   Исключения — отправитель с активным Premium, а также тот, кто **уже писал**
   в этот чат ранее (существующие диалоги остаются открытыми, как в Telegram).
+
+После `promo.sql` появятся:
+- таблицы `promo_codes` (код, дни Premium, лимит и счётчик активаций) и
+  `promo_redemptions` (кто какой код активировал — защита от повтора);
+- RPC `admin_create_promo_code(_code, _premium_days, _max_activations)`,
+  `admin_list_promo_codes()`, `admin_delete_promo_code(_code)` — только для
+  админа `goh@gmail.com`, используются в админ-панели для создания и управления
+  промокодами;
+- RPC `redeem_promo_code(_code)` — любой пользователь активирует код в
+  «Настройки → HouseGram Premium → У меня есть промокод» и получает Premium
+  на указанное число дней (продление от текущей даты окончания).
 
 ### Подтверждение e-mail (по желанию, для удобного теста)
 

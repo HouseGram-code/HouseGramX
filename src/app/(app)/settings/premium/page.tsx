@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, useSpring } from "motion/react";
 import {
   Sparkle,
   LockKey,
   PaperPlaneTilt,
   CheckCircle,
+  Ticket,
+  CaretRight,
 } from "@phosphor-icons/react";
 import { SubScreen } from "@/components/SubScreen";
 import {
@@ -112,6 +115,7 @@ function PremiumStar() {
 }
 
 export default function PremiumPage() {
+  const router = useRouter();
   const [premium, setPremium] = useState<MyPremium | null>(null);
 
   useEffect(() => {
@@ -186,6 +190,26 @@ export default function PremiumPage() {
           <Sparkle size={22} weight="fill" className="transition-transform group-hover:rotate-12" />
           Купить премиум — 200 ₽
         </a>
+
+        {/* У меня есть промокод */}
+        <button
+          type="button"
+          onClick={() => router.push("/settings/premium/promo")}
+          className="mt-3 flex w-full items-center gap-3 rounded-[var(--radius-card)] bg-surface px-4 py-3.5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition active:scale-[0.99]"
+        >
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-accent">
+            <Ticket size={22} weight="fill" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-semibold text-foreground">
+              У меня есть промокод
+            </p>
+            <p className="text-[13px] leading-snug text-muted">
+              Активируйте код и получите Premium со скидкой или бесплатно.
+            </p>
+          </div>
+          <CaretRight size={18} weight="bold" className="shrink-0 text-muted-2" />
+        </button>
 
         {/* Инструкция: после оплаты написать боту техподдержки */}
         <div className="mt-4 rounded-[var(--radius-card)] bg-surface p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
