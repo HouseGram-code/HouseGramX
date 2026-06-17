@@ -15,6 +15,7 @@ import { SubScreen } from "@/components/SubScreen";
 import {
   fetchMyPremium,
   formatPremiumUntil,
+  formatDiscountUntil,
   type MyPremium,
 } from "@/lib/premium";
 
@@ -130,6 +131,14 @@ export default function PremiumPage() {
 
   const active = premium?.active ?? false;
 
+  // Базовая цена и расчёт цены со скидкой (если активна).
+  const BASE_PRICE = 200;
+  const discountActive = premium?.discountActive ?? false;
+  const discountPercent = premium?.discountPercent ?? 0;
+  const price = discountActive
+    ? Math.max(0, Math.round((BASE_PRICE * (100 - discountPercent)) / 100))
+    : BASE_PRICE;
+
   return (
     <SubScreen title="HouseGram Premium">
       <div className="flex flex-col px-4 pt-6">
@@ -173,11 +182,35 @@ export default function PremiumPage() {
         </div>
 
         {/* Цена */}
-        <div className="mt-6 flex items-end justify-center gap-1.5">
-          <span className="text-[40px] font-extrabold leading-none text-foreground">
-            200 ₽
-          </span>
-          <span className="pb-1 text-[15px] font-medium text-muted">/ месяц</span>
+        <div className="mt-6 flex flex-col items-center gap-1.5">
+          {discountActive ? (
+            <>
+              <div className="flex items-end justify-center gap-2">
+                <span className="pb-1 text-[22px] font-bold leading-none text-muted-2 line-through">
+                  {BASE_PRICE} ₽
+                </span>
+                <span className="text-[40px] font-extrabold leading-none text-foreground">
+                  {price} ₽
+                </span>
+                <span className="pb-1 text-[15px] font-medium text-muted">
+                  / месяц
+                </span>
+              </div>
+              <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-accent/15 px-3 py-1 text-[13px] font-semibold text-accent">
+                Скидка −{discountPercent}% · до{" "}
+                {formatDiscountUntil(premium?.discountUntil ?? null)}
+              </span>
+            </>
+          ) : (
+            <div className="flex items-end justify-center gap-1.5">
+              <span className="text-[40px] font-extrabold leading-none text-foreground">
+                {BASE_PRICE} ₽
+              </span>
+              <span className="pb-1 text-[15px] font-medium text-muted">
+                / месяц
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Кнопка покупки — реальная оплата через DonatePay */}
@@ -188,7 +221,7 @@ export default function PremiumPage() {
           className="premium-btn group mt-4 flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-accent to-accent-press px-6 py-4 text-[17px] font-bold text-white shadow-lg shadow-accent/30 transition active:scale-[0.98]"
         >
           <Sparkle size={22} weight="fill" className="transition-transform group-hover:rotate-12" />
-          Купить премиум — 200 ₽
+          Купить премиум — {price} ₽
         </a>
 
         {/* У меня есть промокод */}

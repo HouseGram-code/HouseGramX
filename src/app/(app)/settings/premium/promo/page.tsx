@@ -4,14 +4,14 @@ import { useState } from "react";
 import { Ticket, Sparkle, CheckCircle } from "@phosphor-icons/react";
 import { SubScreen } from "@/components/SubScreen";
 import { useToast } from "@/components/Toast";
-import { redeemPromoCode } from "@/lib/promo";
-import { formatPremiumUntil } from "@/lib/premium";
+import { redeemPromoCode, type RedeemResult } from "@/lib/promo";
+import { formatPremiumUntil, formatDiscountUntil } from "@/lib/premium";
 
 export default function PromoCodePage() {
   const { show } = useToast();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<{ until: string; days: number } | null>(null);
+  const [done, setDone] = useState<RedeemResult | null>(null);
 
   const activate = async () => {
     const c = code.trim();
@@ -22,8 +22,8 @@ export default function PromoCodePage() {
     setBusy(true);
     try {
       const res = await redeemPromoCode(c);
-      setDone({ until: res.premiumUntil, days: res.days });
-      show("Промокод активирован");
+      setDone(res);
+      show(res.kind === "discount" ? "Скидка активирована" : "Промокод активирован");
       setCode("");
     } catch (e) {
       show(e instanceof Error ? e.message : "Ошибка");
@@ -58,13 +58,27 @@ export default function PromoCodePage() {
               weight="fill"
               className="mx-auto text-green-600"
             />
-            <p className="mt-2 text-[16px] font-bold text-foreground">
-              Premium активирован
-            </p>
-            <p className="mt-1 text-[14px] text-muted">
-              {done.days > 0 && `+${done.days} дн. · `}
-              Активен до {formatPremiumUntil(done.until)}
-            </p>
+            {done.kind === "discount" ? (
+              <>
+                <p className="mt-2 text-[16px] font-bold text-foreground">
+                  Скидка активирована
+                </p>
+                <p className="mt-1 text-[14px] text-muted">
+                  −{done.discountPercent}% на Premium · действует до{" "}
+                  {formatDiscountUntil(done.discountUntil)}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-[16px] font-bold text-foreground">
+                  Premium активирован
+                </p>
+                <p className="mt-1 text-[14px] text-muted">
+                  {done.days > 0 && `+${done.days} дн. · `}
+                  Активен до {formatPremiumUntil(done.premiumUntil)}
+                </p>
+              </>
+            )}
             <button
               type="button"
               onClick={() => setDone(null)}

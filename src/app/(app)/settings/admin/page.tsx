@@ -44,12 +44,15 @@ import {
   type AdminUser,
   type AdminStats,
 } from "@/lib/admin";
-import { formatPremiumUntil } from "@/lib/premium";
+import { formatPremiumUntil, formatDiscountUntil } from "@/lib/premium";
 import {
   createPromoCode,
   fetchPromoCodes,
   deletePromoCode,
+  isPromoExpired,
   type PromoCode,
+  type PromoKind,
+  type CreatePromoInput,
 } from "@/lib/promo";
 import { formatLastSeen } from "@/lib/utils";
 
@@ -82,8 +85,12 @@ export default function AdminPage() {
   // Состояние промокодов.
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
   const [promoCode, setPromoCode] = useState("");
+  const [promoKind, setPromoKind] = useState<PromoKind>("premium");
   const [promoDays, setPromoDays] = useState("30");
+  const [promoDiscount, setPromoDiscount] = useState("50");
+  const [promoDuration, setPromoDuration] = useState("1");
   const [promoActivations, setPromoActivations] = useState("1");
+  const [promoValid, setPromoValid] = useState("0");
   const [promoBusy, setPromoBusy] = useState(false);
 
   const isAdmin = isAdminEmail(user?.email);
@@ -204,23 +211,55 @@ export default function AdminPage() {
 
   const createPromo = async () => {
     const c = promoCode.trim().toUpperCase();
-    const days = parseInt(promoDays, 10);
     const acts = parseInt(promoActivations, 10);
+    const validMinutes = (parseInt(promoValid, 10) || 0) * 60;
     if (!c) {
       show("Введите название промокода");
-      return;
-    }
-    if (!days || days <= 0) {
-      show("Укажите число дней");
       return;
     }
     if (!acts || acts <= 0) {
       show("Укажите число активаций");
       return;
     }
+
+    let input: CreatePromoInput;
+    if (promoKind === "discount") {
+      const pct = parseInt(promoDiscount, 10);
+      const durHours = parseInt(promoDuration, 10);
+      if (!pct || pct <= 0 || pct > 100) {
+        show("Скидка должна быть от 1 до 100%");
+        return;
+      }
+      if (!durHours || durHours <= 0) {
+        show("Укажите срок действия скидки (ч)");
+        return;
+      }
+      input = {
+        code: c,
+        kind: "discount",
+        discountPercent: pct,
+        durationMinutes: durHours * 60,
+        maxActivations: acts,
+        validMinutes,
+      };
+    } else {
+      const days = parseInt(promoDays, 10);
+      if (!days || days <= 0) {
+        show("Укажите число дней");
+        return;
+      }
+      input = {
+        code: c,
+        kind: "premium",
+        premiumDays: days,
+        maxActivations: acts,
+        validMinutes,
+      };
+    }
+
     setPromoBusy(true);
     try {
-      const created = await createPromoCode(c, days, acts);
+      const created = await createPromoCode(input);
       setPromoCodes((prev) => [created, ...prev]);
       show("Промокод создан");
       setPromoCode("");
@@ -525,12 +564,34 @@ export default function AdminPage() {
                 Создать промокод
               </p>
               <p className="text-[12px] text-muted">
-                Название, срок Premium и число активаций
+                Premium по дням или скидка на покупку Premium
               </p>
             </div>
           </div>
 
           <div className="border-t border-separator px-4 py-3">
+            {/* Тип кода */}
+            <div className="flex gap-1 rounded-xl bg-surface-2 p-1">
+              <button
+                type="button"
+                onClick={() => setPromoKind("premium")}
+                className={`flex-1 rounded-lg py-2 text-[14px] font-semibold transition ${
+                  promoKind === "premium" ? "bg-accent text-white" : "text-muted"
+                }`}
+              >
+                Premium
+              </button>
+              <button
+                type="button"
+                onClick={() => setPromoKind("discount")}
+                className={`flex-1 rounded-lg py-2 text-[14px] font-semibold transition ${
+                  promoKind === "discount" ? "bg-accent text-white" : "text-muted"
+                }`}
+              >
+                Скидка
+              </button>
+            </div>
+
             <input
               value={promoCode}
               onChange={(e) =>
@@ -540,10 +601,38 @@ export default function AdminPage() {
               autoCapitalize="characters"
               autoCorrect="off"
               spellCheck={false}
-              className="w-full rounded-xl bg-surface-2 px-3 py-2.5 text-[15px] font-semibold uppercase tracking-wide text-foreground placeholder:font-normal placeholder:tracking-normal placeholder:text-muted-2 focus:outline-none focus:ring-1 focus:ring-accent"
+              className="mt-2 w-full rounded-xl bg-surface-2 px-3 py-2.5 text-[15px] font-semibold uppercase tracking-wide text-foreground placeholder:font-normal placeholder:tracking-normal placeholder:text-muted-2 focus:outline-none focus:ring-1 focus:ring-accent"
             />
-            <div className="mt-2 flex items-center gap-2">
-              <div className="flex flex-1 items-center gap-1.5 rounded-xl bg-surface-2 px-3">
+
+            {promoKind === "discount" ? (
+              <div className="mt-2 flex items-center gap-2">
+                <div className="flex flex-1 items-center gap-1.5 rounded-xl bg-surface-2 px-3">
+                  <input
+                    value={promoDiscount}
+                    onChange={(e) =>
+                      setPromoDiscount(e.target.value.replace(/[^0-9]/g, ""))
+                    }
+                    inputMode="numeric"
+                    placeholder="50"
+                    className="w-full bg-transparent py-2.5 text-[15px] text-foreground placeholder:text-muted-2 focus:outline-none"
+                  />
+                  <span className="shrink-0 text-[13px] text-muted">% скидка</span>
+                </div>
+                <div className="flex flex-1 items-center gap-1.5 rounded-xl bg-surface-2 px-3">
+                  <input
+                    value={promoDuration}
+                    onChange={(e) =>
+                      setPromoDuration(e.target.value.replace(/[^0-9]/g, ""))
+                    }
+                    inputMode="numeric"
+                    placeholder="1"
+                    className="w-full bg-transparent py-2.5 text-[15px] text-foreground placeholder:text-muted-2 focus:outline-none"
+                  />
+                  <span className="shrink-0 text-[13px] text-muted">ч скидка</span>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-2 flex items-center gap-1.5 rounded-xl bg-surface-2 px-3">
                 <input
                   value={promoDays}
                   onChange={(e) =>
@@ -553,8 +642,11 @@ export default function AdminPage() {
                   placeholder="30"
                   className="w-full bg-transparent py-2.5 text-[15px] text-foreground placeholder:text-muted-2 focus:outline-none"
                 />
-                <span className="shrink-0 text-[13px] text-muted">дней</span>
+                <span className="shrink-0 text-[13px] text-muted">дней Premium</span>
               </div>
+            )}
+
+            <div className="mt-2 flex items-center gap-2">
               <div className="flex flex-1 items-center gap-1.5 rounded-xl bg-surface-2 px-3">
                 <input
                   value={promoActivations}
@@ -567,7 +659,24 @@ export default function AdminPage() {
                 />
                 <span className="shrink-0 text-[13px] text-muted">актив.</span>
               </div>
+              <div className="flex flex-1 items-center gap-1.5 rounded-xl bg-surface-2 px-3">
+                <input
+                  value={promoValid}
+                  onChange={(e) =>
+                    setPromoValid(e.target.value.replace(/[^0-9]/g, ""))
+                  }
+                  inputMode="numeric"
+                  placeholder="0"
+                  className="w-full bg-transparent py-2.5 text-[15px] text-foreground placeholder:text-muted-2 focus:outline-none"
+                />
+                <span className="shrink-0 text-[13px] text-muted">ч код</span>
+              </div>
             </div>
+            <p className="mt-1.5 px-1 text-[11px] leading-snug text-muted-2">
+              «ч код» — через сколько часов код перестанет активироваться
+              (0 = без ограничения по времени).
+            </p>
+
             <button
               type="button"
               disabled={promoBusy}
@@ -591,20 +700,47 @@ export default function AdminPage() {
               {promoCodes.map((p) => {
                 const left = Math.max(0, p.max_activations - p.used_count);
                 const exhausted = left <= 0;
+                const durText =
+                  p.duration_minutes >= 60
+                    ? `${Math.round(p.duration_minutes / 60)} ч`
+                    : `${p.duration_minutes} мин`;
+                const expired = isPromoExpired(p);
                 return (
                   <div
                     key={p.code}
                     className="flex items-center gap-3 px-4 py-3 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-separator"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[15px] font-bold tracking-wide text-foreground">
-                        {p.code}
-                      </p>
-                      <p className="text-[12px] text-muted">
-                        {p.premium_days} дн. Premium ·{" "}
-                        <span className={exhausted ? "text-red-500" : ""}>
-                          {p.used_count}/{p.max_activations} активаций
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-[15px] font-bold tracking-wide text-foreground">
+                          {p.code}
+                        </p>
+                        <span
+                          className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                            p.kind === "discount"
+                              ? "bg-accent/15 text-accent"
+                              : "bg-green-500/15 text-green-600"
+                          }`}
+                        >
+                          {p.kind === "discount" ? "СКИДКА" : "PREMIUM"}
                         </span>
+                      </div>
+                      <p className="text-[12px] text-muted">
+                        {p.kind === "discount"
+                          ? `−${p.discount_percent}% · ${durText}`
+                          : `${p.premium_days} дн. Premium`}
+                        {" · "}
+                        <span className={exhausted ? "text-red-500" : ""}>
+                          {p.used_count}/{p.max_activations}
+                        </span>
+                        {p.expires_at && (
+                          <span className={expired ? "text-red-500" : ""}>
+                            {" · "}
+                            {expired
+                              ? "истёк"
+                              : `до ${formatDiscountUntil(p.expires_at)}`}
+                          </span>
+                        )}
                       </p>
                     </div>
                     <button

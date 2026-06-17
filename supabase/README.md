@@ -87,15 +87,19 @@ SUPABASE_SERVICE_ROLE_KEY=sb_secret_...   # только сервер, в кли
   в этот чат ранее (существующие диалоги остаются открытыми, как в Telegram).
 
 После `promo.sql` появятся:
-- таблицы `promo_codes` (код, дни Premium, лимит и счётчик активаций) и
-  `promo_redemptions` (кто какой код активировал — защита от повтора);
-- RPC `admin_create_promo_code(_code, _premium_days, _max_activations)`,
-  `admin_list_promo_codes()`, `admin_delete_promo_code(_code)` — только для
-  админа `goh@gmail.com`, используются в админ-панели для создания и управления
-  промокодами;
+- таблицы `promo_codes` (код, тип, дни Premium / скидка %, срок жизни скидки,
+  лимит и счётчик активаций, срок действия кода) и `promo_redemptions` (кто какой
+  код активировал — защита от повтора); плюс колонки
+  `profiles.premium_discount_percent` и `profiles.premium_discount_until`
+  (персональная скидка пользователя);
+- RPC `admin_create_promo_code(...)`, `admin_list_promo_codes()`,
+  `admin_delete_promo_code(_code)` — только для админа `goh@gmail.com`,
+  используются в админ-панели для создания и управления промокодами;
 - RPC `redeem_promo_code(_code)` — любой пользователь активирует код в
-  «Настройки → HouseGram Premium → У меня есть промокод» и получает Premium
-  на указанное число дней (продление от текущей даты окончания).
+  «Настройки → HouseGram Premium → У меня есть промокод». Код типа **premium**
+  выдаёт/продлевает Premium на N дней; код типа **discount** включает скидку на
+  покупку Premium на заданный срок (час и т.д.). У любого кода можно задать срок
+  действия, после которого его уже нельзя активировать.
 
 ### Подтверждение e-mail (по желанию, для удобного теста)
 
