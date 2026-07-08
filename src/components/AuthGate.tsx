@@ -377,7 +377,7 @@ function AuthForm({
                     }`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={src} alt="avatar" className="h-full w-full object-cover" />
+                    <img src={src} alt="avatar" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                     {active && (
                       <span className="absolute inset-0 flex items-center justify-center bg-accent/40">
                         <Check size={22} weight="bold" className="text-white" />

@@ -49,7 +49,7 @@ export function BottomNav() {
                   {active && (
                     <motion.span
                       layoutId="nav-pill"
-                      className="absolute inset-0 rounded-2xl bg-gradient-to-b from-accent/20 to-accent/10 ring-1 ring-accent/15"
+                      className="absolute inset-0 rounded-2xl bg-gradient-to-b from-accent/25 to-accent/10 ring-1 ring-accent/20 shadow-[0_6px_16px_-6px_rgba(250,58,58,0.4)]"
                       transition={{
                         type: "spring",
                         stiffness: 450,

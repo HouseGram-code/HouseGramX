@@ -837,7 +837,7 @@ export default function ChatPage({
                                   },
                                 },
                                 {
-                                  label: "Очистить у всех",
+                                  label: "��чистить у всех",
                                   danger: true,
                                   onClick: () => {
                                     clearHistory(conv.id);
@@ -1436,7 +1436,7 @@ export default function ChatPage({
             />
           ) : (
             <div className="flex items-end gap-1.5">
-              <div className="flex min-w-0 flex-1 items-end rounded-[24px] bg-surface-2 px-1 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ring-1 ring-separator/60">
+              <div className="glass-field flex min-w-0 flex-1 items-end rounded-[24px] px-1 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ring-1 ring-separator/60">
                 <button
                   type="button"
                   aria-label="Стикеры"
@@ -1518,7 +1518,7 @@ export default function ChatPage({
                   initial={{ scale: 0.6, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   whileTap={{ scale: 0.85 }}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-white shadow-md shadow-accent/25 transition hover:bg-accent-press"
+                  className="btn-tg-circle flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition"
                 >
                   {editing ? (
                     <Check size={22} weight="bold" />
@@ -1545,7 +1545,7 @@ export default function ChatPage({
                         ? "0 0 0 4px rgba(250,58,58,0.18)"
                         : "0 4px 10px rgba(250,58,58,0.25)",
                   }}
-                  className="relative flex h-11 w-11 shrink-0 touch-none select-none items-center justify-center overflow-hidden rounded-full bg-accent text-white transition hover:bg-accent-press"
+                  className="btn-tg-circle relative flex h-11 w-11 shrink-0 touch-none select-none items-center justify-center overflow-hidden rounded-full transition"
                 >
                   <AnimatePresence mode="popLayout" initial={false}>
                     <motion.span
