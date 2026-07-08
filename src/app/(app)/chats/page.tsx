@@ -367,7 +367,7 @@ export default function ChatsPage() {
                   type="button"
                   aria-label="Поиск"
                   onClick={() => searchRef.current?.focus()}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-muted transition active:scale-90"
+                  className="glass-field flex h-9 w-9 items-center justify-center rounded-full text-muted ring-1 ring-separator/60 transition active:scale-90"
                 >
                   <MagnifyingGlass size={20} weight="bold" />
                 </button>
@@ -430,7 +430,7 @@ export default function ChatsPage() {
 
             {/* Фильтры (segmented control с бейджем непрочитанных) */}
             {!query.trim() && !showArchived && (
-              <div className="mt-3 flex items-center gap-1.5 rounded-2xl bg-surface-2 p-1">
+              <div className="glass-field mt-3 flex items-center gap-1.5 rounded-2xl p-1 ring-1 ring-separator/50">
                 {filters.map((f) => {
                   const active = filter === f.key;
                   return (
@@ -547,7 +547,7 @@ export default function ChatsPage() {
                   />
                   {!conv.peerBlockedMe &&
                     (conv.online || conv.kind === "bot" || isOnline(conv.peerId)) && (
-                      <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-surface bg-green-500" />
+                      <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-surface bg-green-500 shadow-[0_0_6px_1px_rgba(34,197,94,0.5)]" />
                     )}
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col border-b border-separator pb-2.5">

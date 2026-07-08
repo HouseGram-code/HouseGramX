@@ -98,9 +98,9 @@ export default function ProfileEditPage() {
   };
 
   return (
-    <div className="flex h-full flex-1 flex-col bg-background">
+    <div className="settings-bg flex h-full flex-1 flex-col">
       {/* Шапка */}
-      <header className="z-20 flex items-center gap-2 border-b border-separator bg-surface/90 px-3 pt-[max(env(safe-area-inset-top),0.625rem)] pb-2.5 backdrop-blur-xl">
+      <header className="glass-header z-20 flex items-center gap-2 border-b border-separator px-3 pt-[max(env(safe-area-inset-top),0.625rem)] pb-2.5">
         <button
           type="button"
           onClick={() => router.back()}
@@ -137,7 +137,7 @@ export default function ProfileEditPage() {
               type="button"
               onClick={() => fileRef.current?.click()}
               aria-label="Загрузить фото"
-              className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full bg-accent text-white ring-4 ring-background transition active:scale-90"
+              className="btn-tg-circle absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full ring-4 ring-background transition active:scale-90"
             >
               <Camera size={18} weight="fill" />
             </button>
@@ -243,7 +243,7 @@ export default function ProfileEditPage() {
             whileTap={{ scale: 0.98 }}
             onClick={handleSave}
             disabled={!canSave || saving}
-            className="w-full rounded-2xl bg-accent py-3.5 text-[16px] font-semibold text-white shadow-sm transition disabled:opacity-40"
+            className="btn-tg w-full py-3.5 text-[16px] disabled:opacity-40"
           >
             {saving ? "Сохранение…" : "Сохранить"}
           </motion.button>
