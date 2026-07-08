@@ -22,10 +22,10 @@ export function SideNav() {
   const totalUnread = conversations.reduce((n, c) => n + countUnread(c), 0);
 
   return (
-    <aside className="hidden w-[88px] shrink-0 flex-col items-center gap-1 border-r border-separator bg-surface py-5 md:flex lg:w-[260px] lg:items-stretch lg:px-3">
+    <aside className="glass-nav hidden w-[88px] shrink-0 flex-col items-center gap-1 border-r border-separator py-5 md:flex lg:w-[260px] lg:items-stretch lg:px-3">
       {/* Логотип */}
       <div className="mb-4 flex items-center gap-3 px-2 lg:px-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent text-white">
+        <span className="btn-tg-circle flex h-10 w-10 items-center justify-center rounded-2xl">
           <ChatCircleDots size={24} weight="fill" />
         </span>
         <span className="hidden text-lg font-bold tracking-tight text-foreground lg:inline">

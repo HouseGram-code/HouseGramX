@@ -135,3 +135,136 @@ body {
   color: var(--muted-2);
   pointer-events: none;
 }
+
+/* ============================================================
+   Улучшения интерфейса (HouseGram): стекло + кнопки в стиле Telegram
+   ============================================================ */
+
+/* Мягкое стекло для панелей навигации (нижней и боковой). */
+.glass-nav {
+  background: color-mix(in srgb, var(--surface) 66%, transparent);
+  backdrop-filter: saturate(180%) blur(22px);
+  -webkit-backdrop-filter: saturate(180%) blur(22px);
+}
+
+/* Стеклянная «шапка» экрана. */
+.glass-header {
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  backdrop-filter: saturate(180%) blur(22px);
+  -webkit-backdrop-filter: saturate(180%) blur(22px);
+}
+
+/* Стеклянная карточка (экран входа, диалоги и т.п.). */
+.glass-card {
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  backdrop-filter: saturate(180%) blur(30px);
+  -webkit-backdrop-filter: saturate(180%) blur(30px);
+  border: 1px solid color-mix(in srgb, var(--foreground) 9%, transparent);
+  box-shadow:
+    0 24px 60px -28px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 32%, transparent);
+}
+
+/* Стеклянное поле ввода / мягкая плашка. */
+.glass-field {
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  backdrop-filter: saturate(160%) blur(14px);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+}
+
+/* Кнопка в стиле Telegram: градиент, блик сверху, мягкая тень, отклик. */
+.btn-tg {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  overflow: hidden;
+  border-radius: 16px;
+  color: #fff;
+  font-weight: 600;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 90%, #ffffff 10%) 0%,
+    var(--accent) 45%,
+    var(--accent-press) 100%
+  );
+  box-shadow:
+    0 10px 24px -10px color-mix(in srgb, var(--accent) 78%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: transform 0.16s ease, box-shadow 0.22s ease, filter 0.2s ease;
+}
+.btn-tg::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 55% 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+.btn-tg:hover {
+  filter: brightness(1.04);
+}
+.btn-tg:active {
+  transform: scale(0.97);
+}
+.btn-tg:disabled {
+  opacity: 0.45;
+  box-shadow: none;
+}
+
+/* Круглая иконочная кнопка в стиле Telegram (например, «+»). */
+.btn-tg-circle {
+  position: relative;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--accent) 88%, #ffffff 12%) 0%,
+    var(--accent) 52%,
+    var(--accent-press) 100%
+  );
+  color: #fff;
+  box-shadow:
+    0 8px 18px -8px color-mix(in srgb, var(--accent) 78%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  transition: transform 0.16s ease, filter 0.2s ease;
+}
+.btn-tg-circle:hover {
+  filter: brightness(1.05);
+}
+.btn-tg-circle:active {
+  transform: scale(0.9);
+}
+
+/* Фон экрана входа: мягкое свечение акцента поверх фона. */
+.auth-bg {
+  background:
+    radial-gradient(
+      120% 90% at 50% -10%,
+      color-mix(in srgb, var(--accent) 18%, transparent) 0%,
+      transparent 55%
+    ),
+    var(--background);
+}
+
+/* Плавающие «пузыри» на фоне входа. */
+@keyframes orb-float {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(0, -22px) scale(1.08);
+  }
+}
+.animate-orb {
+  animation: orb-float 9s ease-in-out infinite;
+}
+.animate-orb-slow {
+  animation: orb-float 13s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-orb,
+  .animate-orb-slow {
+    animation: none;
+  }
+}

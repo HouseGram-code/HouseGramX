@@ -166,17 +166,18 @@ function AuthForm({
   };
 
   return (
-    <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-6 py-10">
+    <div className="auth-bg relative flex min-h-dvh flex-col items-center justify-center overflow-hidden px-6 py-10">
       <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-accent/20 blur-3xl" />
-        <div className="absolute bottom-0 right-0 h-64 w-64 rounded-full bg-accent/10 blur-3xl" />
+        <div className="animate-orb absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-accent/25 blur-3xl" />
+        <div className="animate-orb-slow absolute bottom-0 right-0 h-64 w-64 rounded-full bg-accent/15 blur-3xl" />
+        <div className="animate-orb-slow absolute -left-10 top-1/3 h-56 w-56 rounded-full bg-accent/10 blur-3xl" />
       </div>
 
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
-        className="w-full max-w-sm"
+        className="glass-card w-full max-w-sm rounded-[28px] p-6 sm:p-7"
       >
         {/* Логотип */}
         <div className="mb-7 flex flex-col items-center gap-3">
@@ -282,7 +283,7 @@ function AuthForm({
               />
               {username.length > 0 && !usernameOk ? (
                 <p className="mt-1 px-1 text-[12px] text-accent">
-                  Латиница, цифры и _, от 3 до 32 символов
+                  Латиница, цифры и _, от 3 до 32 ��имволов
                 </p>
               ) : usernameStatus === "taken" ? (
                 <p className="mt-1 px-1 text-[12px] font-medium text-accent">
@@ -399,7 +400,7 @@ function AuthForm({
                   setStep(1);
                   reset();
                 }}
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-surface text-foreground ring-1 ring-separator transition active:scale-95"
+                className="glass-field flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-foreground ring-1 ring-separator transition active:scale-95"
                 aria-label="Назад"
               >
                 <CaretLeft size={22} weight="bold" />
@@ -409,7 +410,7 @@ function AuthForm({
                 whileTap={{ scale: 0.98 }}
                 onClick={finishSignup}
                 disabled={busy}
-                className="flex flex-1 items-center justify-center rounded-2xl bg-accent py-3.5 text-[16px] font-semibold text-white shadow-sm transition disabled:opacity-40"
+                className="btn-tg flex-1 py-3.5 text-[16px] disabled:opacity-40"
               >
                 {busy ? (
                   <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -481,7 +482,7 @@ function SubmitButton({
       type="submit"
       whileTap={{ scale: 0.98 }}
       disabled={disabled || busy}
-      className="mt-1 flex w-full items-center justify-center rounded-2xl bg-accent py-3.5 text-[16px] font-semibold text-white shadow-sm transition disabled:opacity-40"
+      className="btn-tg mt-1 w-full py-3.5 text-[16px] disabled:opacity-40"
     >
       {busy ? (
         <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -536,7 +537,7 @@ function Field({
 } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">) {
   return (
     <div
-      className={`flex items-center gap-2.5 rounded-2xl bg-surface px-3.5 ring-1 transition ${
+      className={`flex items-center gap-2.5 glass-field rounded-2xl px-3.5 ring-1 transition ${
         valid ? "ring-separator focus-within:ring-accent" : "ring-accent"
       }`}
     >

@@ -332,8 +332,8 @@ export default function ChatsPage() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-surface">
-      {/* ��апка */}
-      <header className="z-10 bg-surface px-4 pt-[max(env(safe-area-inset-top),1rem)] pb-2">
+      {/* Шапка */}
+      <header className="glass-header z-10 px-4 pt-[max(env(safe-area-inset-top),1rem)] pb-2">
         {selectMode ? (
           // ── Шапка режима выбора ──
           <div className="flex h-9 items-center justify-between">
@@ -376,7 +376,7 @@ export default function ChatsPage() {
                     type="button"
                     aria-label="Создать"
                     onClick={() => setMenuOpen((o) => !o)}
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-white shadow-sm transition active:scale-90"
+                    className="btn-tg-circle flex h-9 w-9 items-center justify-center rounded-full transition active:scale-90"
                   >
                     <Plus size={22} weight="bold" />
                   </button>
@@ -406,7 +406,7 @@ export default function ChatsPage() {
             </div>
 
             {/* Поиск */}
-            <div className="mt-3 flex items-center gap-2 rounded-2xl bg-surface-2 px-3 py-2.5">
+            <div className="glass-field mt-3 flex items-center gap-2 rounded-2xl px-3 py-2.5 ring-1 ring-separator/60">
               <MagnifyingGlass size={18} weight="bold" className="text-muted-2" />
               <input
                 ref={searchRef}
