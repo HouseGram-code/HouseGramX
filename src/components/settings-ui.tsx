@@ -21,7 +21,7 @@ export function Group({ children }: { children: React.ReactNode }) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, ease: "easeOut" }}
-      className="mx-3 overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+      className="glass-group mx-3 overflow-hidden rounded-[var(--radius-card)] shadow-[0_10px_28px_-14px_rgba(0,0,0,0.22)]"
     >
       {children}
     </motion.div>
@@ -102,7 +102,7 @@ export function NavRow({
       {Icon &&
         (iconBg ? (
           <span
-            className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] shadow-sm transition-transform duration-200 group-active:scale-90"
+            className="icon-plate flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] shadow-sm transition-transform duration-200 group-active:scale-90"
             style={{ backgroundColor: iconBg }}
           >
             <Icon size={19} weight="fill" className="text-white" />

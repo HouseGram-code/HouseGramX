@@ -20,8 +20,8 @@ export function SubScreen({
   const router = useRouter();
 
   return (
-    <div className="flex h-full flex-1 flex-col bg-background">
-      <header className="sticky top-0 z-20 flex items-center gap-1 border-b border-separator bg-surface/90 px-2 pt-[max(env(safe-area-inset-top),0.625rem)] pb-2.5 backdrop-blur-xl">
+    <div className="settings-bg flex h-full flex-1 flex-col">
+      <header className="glass-header sticky top-0 z-20 flex items-center gap-1 border-b border-separator px-2 pt-[max(env(safe-area-inset-top),0.625rem)] pb-2.5">
         <button
           type="button"
           onClick={() => router.back()}

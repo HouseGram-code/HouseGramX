@@ -41,7 +41,7 @@ export function Avatar({
     return (
       <div
         className={cn(
-          "shrink-0 overflow-hidden rounded-full bg-surface-2",
+          "avatar-ring shrink-0 overflow-hidden rounded-full bg-surface-2",
           className
         )}
         style={boxStyle}
@@ -71,7 +71,7 @@ export function Avatar({
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full font-medium text-white select-none",
+        "avatar-fallback avatar-ring flex shrink-0 items-center justify-center rounded-full font-medium text-white select-none",
         className
       )}
       style={fallbackStyle}

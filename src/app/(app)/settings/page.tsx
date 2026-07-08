@@ -65,14 +65,14 @@ export default function SettingsPage() {
   }, []);
 
   return (
-    <div className="no-scrollbar flex-1 overflow-y-auto bg-background">
+    <div className="settings-bg no-scrollbar flex-1 overflow-y-auto">
       {/* Верхняя панель */}
       <div className="flex items-center justify-between px-4 pt-[max(env(safe-area-inset-top),1rem)]">
         <button
           type="button"
           aria-label="QR-код"
           onClick={() => router.push("/settings/profile/qr")}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-foreground transition active:scale-90 active:bg-surface-2/70 md:hover:bg-surface-2/80"
+          className="glass-field flex h-10 w-10 items-center justify-center rounded-full text-foreground ring-1 ring-separator/60 transition active:scale-90 md:hover:brightness-95"
         >
           <QrCode size={22} weight="regular" />
         </button>
@@ -80,7 +80,7 @@ export default function SettingsPage() {
           type="button"
           aria-label="Редактировать профиль"
           onClick={() => router.push("/settings/profile")}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-foreground transition active:scale-90 active:bg-surface-2/70 md:hover:bg-surface-2/80"
+          className="glass-field flex h-10 w-10 items-center justify-center rounded-full text-foreground ring-1 ring-separator/60 transition active:scale-90 md:hover:brightness-95"
         >
           <PencilSimple size={20} weight="regular" />
         </button>
